@@ -2,45 +2,38 @@ package formstream
 
 import (
 	"io"
+	"mime"
 	"net/textproto"
 )
 
 type Parser struct {
 	boundary       string
 	maxMemFileSize DataSize
-	Value          map[string][]*Value
-	valueHeaderMap map[string][]*FileHeader
+	valueMap       map[string][]Value
 	hookMap        map[string]streamHook
 }
 
-func NewParser(options ...ParserOption) *Parser {
+func NewParser(boundary string, options ...ParserOption) *Parser {
 	c := &parserConfig{
-		boundary: "",
+		maxMemFileSize: 32 * MB,
 	}
 	for _, opt := range options {
 		opt(c)
 	}
 
 	return &Parser{
-		boundary:       c.boundary,
+		boundary:       boundary,
 		maxMemFileSize: c.maxMemFileSize,
-		Value:          make(map[string][]*Value),
+		valueMap:       make(map[string][]Value),
 		hookMap:        make(map[string]streamHook),
 	}
 }
 
 type parserConfig struct {
-	boundary       string
 	maxMemFileSize DataSize
 }
 
 type ParserOption func(*parserConfig)
-
-func WithBoundary(boundary string) ParserOption {
-	return func(c *parserConfig) {
-		c.boundary = boundary
-	}
-}
 
 type DataSize uint64
 
@@ -58,22 +51,53 @@ func WithMaxMemFileSize(maxMemFileSize DataSize) ParserOption {
 }
 
 type Value struct {
-	Body []byte
-	*FileHeader
+	content []byte
+	header  Header
 }
 
-// String returns the value as a string.
-// Note: This function ignores the charset. If you need to consider the charset, convert to string by yourself.
-func (v *Value) String() string {
-	return string(v.Body)
+func (v Value) Unwrap() (string, Header) {
+	return string(v.content), v.header
 }
 
-type FileHeader struct {
-	FileName string
-	Header   textproto.MIMEHeader
+func (v Value) UnwrapRaw() ([]byte, Header) {
+	return v.content, v.header
 }
 
-type StreamHookFunc = func(r io.Reader, fileName string, header textproto.MIMEHeader) error
+type Header struct {
+	dispositionParams map[string]string
+	header            textproto.MIMEHeader
+}
+
+func newHeader(h textproto.MIMEHeader) Header {
+	contentDisposition := h.Get("Content-Disposition")
+	_, params, err := mime.ParseMediaType(contentDisposition)
+	if err != nil {
+		params = make(map[string]string)
+	}
+
+	return Header{
+		dispositionParams: params,
+		header:            h,
+	}
+}
+
+func (h Header) Get(key string) string {
+	return h.header.Get(key)
+}
+
+func (h Header) ContentType() string {
+	return h.header.Get("Content-Type")
+}
+
+func (h Header) Name() string {
+	return h.dispositionParams["name"]
+}
+
+func (h Header) FileName() string {
+	return h.dispositionParams["filename"]
+}
+
+type StreamHookFunc = func(r io.Reader, header Header) error
 
 type streamHook struct {
 	fn           StreamHookFunc

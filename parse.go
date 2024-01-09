@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"io"
 	"mime/multipart"
-	"net/textproto"
 	"os"
 )
 
@@ -43,12 +42,6 @@ func (p *Parser) parse(r io.Reader, wh iHookSatisfactionChecker) error {
 			return fmt.Errorf("failed to read next part: %w", err)
 		}
 
-		fileHeader := FileHeader{
-			FileName: part.FileName(),
-			Header:   part.Header,
-		}
-		p.valueHeaderMap[part.FormName()] = append(p.valueHeaderMap[part.FormName()], &fileHeader)
-
 		if _, ok := p.hookMap[part.FormName()]; ok {
 			err := wh.runOrSetHook(part.FormName(), part)
 			if err != nil {
@@ -60,9 +53,9 @@ func (p *Parser) parse(r io.Reader, wh iHookSatisfactionChecker) error {
 				return fmt.Errorf("failed to copy part: %w", err)
 			}
 
-			p.Value[part.FormName()] = append(p.Value[part.FormName()], &Value{
-				Body:       b.Bytes(),
-				FileHeader: &fileHeader,
+			p.valueMap[part.FormName()] = append(p.valueMap[part.FormName()], Value{
+				content: b.Bytes(),
+				header:  newHeader(part.Header),
 			})
 		}
 
@@ -114,8 +107,10 @@ func newHookSatisfactionChecker(streamHooks map[string]streamHook) *hookSatisfac
 }
 
 func (w *hookSatisfactionChecker) runOrSetHook(name string, part *multipart.Part) error {
+	header := newHeader(part.Header)
+
 	if fn := w.satisfiedHooks[name]; fn != nil {
-		err := fn(part, part.FileName(), part.Header)
+		err := fn(part, header)
 		if err != nil {
 			return fmt.Errorf("failed to execute hook: %w", err)
 		}
@@ -129,9 +124,8 @@ func (w *hookSatisfactionChecker) runOrSetHook(name string, part *multipart.Part
 
 	if hook, ok := w.hookMap[name]; ok {
 		hook.callParams = &callParams{
-			reader:   f,
-			fileName: part.FileName(),
-			header:   part.Header,
+			reader: f,
+			header: header,
 		}
 	} else {
 		// actually not reached
@@ -165,7 +159,7 @@ func (w *hookSatisfactionChecker) runSatisfiedHook(name string) error {
 				}
 			}()
 
-			err = hook.fn(hook.callParams.reader, hook.callParams.fileName, hook.callParams.header)
+			err = hook.fn(hook.callParams.reader, hook.callParams.header)
 			if err != nil {
 				return fmt.Errorf("failed to execute hook of %s: %v", hook.name, err)
 			}
@@ -208,7 +202,6 @@ type waitHook struct {
 }
 
 type callParams struct {
-	reader   io.ReadCloser
-	fileName string
-	header   textproto.MIMEHeader
+	reader io.ReadCloser
+	header Header
 }
