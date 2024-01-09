@@ -36,7 +36,7 @@ type registerConfig struct {
 
 type RegisterOption func(*registerConfig)
 
-func WithFieldRequirement(name string) RegisterOption {
+func WithRequiredPart(name string) RegisterOption {
 	return func(c *registerConfig) {
 		c.requireParts = append(c.requireParts, name)
 	}
