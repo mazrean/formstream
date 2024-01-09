@@ -15,7 +15,7 @@ type Parser struct {
 
 func NewParser(boundary string, options ...ParserOption) *Parser {
 	c := &parserConfig{
-		maxMemFileSize: 32 * MB,
+		maxMemFileSize: defaultMaxMemFileSize,
 	}
 	for _, opt := range options {
 		opt(c)
@@ -43,6 +43,8 @@ const (
 	MB
 	GB
 )
+
+const defaultMaxMemFileSize = 32 * MB
 
 func WithMaxMemFileSize(maxMemFileSize DataSize) ParserOption {
 	return func(c *parserConfig) {
