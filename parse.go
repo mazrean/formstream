@@ -1,5 +1,7 @@
 package formstream
 
+//go:generate go run github.com/golang/mock/mockgen -source=$GOFILE -destination=mock/${GOFILE} -package=mock
+
 import (
 	"bytes"
 	"errors"
@@ -11,7 +13,7 @@ import (
 )
 
 func (p *Parser) Parse(r io.Reader) (err error) {
-	wh := newWaitHooks(p.hookMap)
+	wh := newHookSatisfactionChecker(p.hookMap)
 	defer func() {
 		deferErr := wh.Close()
 		// capture the error of Close()
@@ -24,10 +26,16 @@ func (p *Parser) Parse(r io.Reader) (err error) {
 		}
 	}()
 
+	err = p.parse(r, wh)
+
+	return err
+}
+
+func (p *Parser) parse(r io.Reader, wh iHookSatisfactionChecker) error {
 	mr := multipart.NewReader(r, p.boundary)
 	for {
 		var part *multipart.Part
-		part, err = mr.NextPart()
+		part, err := mr.NextPart()
 		if err != nil {
 			if err == io.EOF {
 				break
@@ -42,13 +50,13 @@ func (p *Parser) Parse(r io.Reader) (err error) {
 		p.valueHeaderMap[part.FormName()] = append(p.valueHeaderMap[part.FormName()], &fileHeader)
 
 		if _, ok := p.hookMap[part.FormName()]; ok {
-			err = wh.runOrSetHook(part.FormName(), part)
+			err := wh.runOrSetHook(part.FormName(), part)
 			if err != nil {
 				return fmt.Errorf("failed to run or set hook: %w", err)
 			}
 		} else {
 			b := bytes.NewBuffer(nil)
-			if _, err = io.Copy(b, part); err != nil {
+			if _, err := io.Copy(b, part); err != nil {
 				return fmt.Errorf("failed to copy part: %w", err)
 			}
 
@@ -67,13 +75,18 @@ func (p *Parser) Parse(r io.Reader) (err error) {
 	return nil
 }
 
-type waitHooks struct {
+type iHookSatisfactionChecker interface {
+	runOrSetHook(name string, part *multipart.Part) error
+	runSatisfiedHook(name string) error
+}
+
+type hookSatisfactionChecker struct {
 	satisfiedHooks   map[string]StreamHookFunc
 	unsatisfiedHooks map[string][]*waitHook
 	hookMap          map[string]*waitHook
 }
 
-func newWaitHooks(streamHooks map[string]streamHook) *waitHooks {
+func newHookSatisfactionChecker(streamHooks map[string]streamHook) *hookSatisfactionChecker {
 	satisfiedHooks := make(map[string]StreamHookFunc, len(streamHooks))
 	unsatisfiedHooks := make(map[string][]*waitHook)
 	hookMap := make(map[string]*waitHook, len(streamHooks))
@@ -94,13 +107,13 @@ func newWaitHooks(streamHooks map[string]streamHook) *waitHooks {
 		}
 	}
 
-	return &waitHooks{
+	return &hookSatisfactionChecker{
 		satisfiedHooks:   satisfiedHooks,
 		unsatisfiedHooks: make(map[string][]*waitHook),
 	}
 }
 
-func (w *waitHooks) runOrSetHook(name string, part *multipart.Part) error {
+func (w *hookSatisfactionChecker) runOrSetHook(name string, part *multipart.Part) error {
 	if fn := w.satisfiedHooks[name]; fn != nil {
 		err := fn(part, part.FileName(), part.Header)
 		if err != nil {
@@ -128,7 +141,7 @@ func (w *waitHooks) runOrSetHook(name string, part *multipart.Part) error {
 	return nil
 }
 
-func (w *waitHooks) runSatisfiedHook(name string) error {
+func (w *hookSatisfactionChecker) runSatisfiedHook(name string) error {
 	var errs []error
 	for _, hook := range w.unsatisfiedHooks[name] {
 		if hook.unsatisfiedCount <= 0 {
@@ -170,7 +183,7 @@ func (w *waitHooks) runSatisfiedHook(name string) error {
 	return nil
 }
 
-func (w *waitHooks) Close() error {
+func (w *hookSatisfactionChecker) Close() error {
 	var errs []error
 	for _, hook := range w.hookMap {
 		if hook.unsatisfiedCount > 0 && hook.callParams != nil {
