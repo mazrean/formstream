@@ -6,11 +6,14 @@ import (
 )
 
 type IConditionJudger[K comparable, S any, T any] interface {
+	IsHookExist(key K) bool
 	HookEvent(key K, value S) (bool, error)
 	KeyEvent(key K) error
 }
 
+// ConditionJudger If the condition is met, execute immediately; if not, wait until it is met and execute.
 type ConditionJudger[K comparable, S any, T any] struct {
+	// preProcessFunc Convert value conversions when conditions are not met
 	preProcessFunc   PreProcessFunc[S, T]
 	satisfiedHooks   map[K]func(S) error
 	unsatisfiedHooks map[K][]*waitHook[K, S, T]
@@ -65,6 +68,13 @@ func NewConditionJudger[K comparable, S any, T any](hookMap map[K]Hook[K, S, T],
 	}
 }
 
+func (w *ConditionJudger[K, S, T]) IsHookExist(key K) bool {
+	_, ok := w.hooks[key]
+	return ok
+}
+
+var ErrNoHooks = errors.New("no hooks")
+
 func (w *ConditionJudger[K, S, T]) HookEvent(key K, value S) (bool, error) {
 	if fn := w.satisfiedHooks[key]; fn != nil {
 		err := fn(value)
@@ -80,7 +90,10 @@ func (w *ConditionJudger[K, S, T]) HookEvent(key K, value S) (bool, error) {
 		return false, fmt.Errorf("failed to pre-process: %w", err)
 	}
 
-	hookValue := w.hooks[key]
+	hookValue, ok := w.hooks[key]
+	if !ok {
+		return false, ErrNoHooks
+	}
 	hookValue.callParams = append(hookValue.callParams, callParam)
 
 	return false, nil

@@ -27,7 +27,7 @@ func (p *Parser) Parse(r io.Reader) (err error) {
 
 	err = p.parse(r, hsc.IConditionJudger)
 
-	return err
+	return
 }
 
 func (p *Parser) parse(r io.Reader, hsc conditionjudge.IConditionJudger[string, *normalParam, *abnoramlParam]) error {
@@ -43,7 +43,7 @@ func (p *Parser) parse(r io.Reader, hsc conditionjudge.IConditionJudger[string, 
 		}
 
 		header := newHeader(part.Header)
-		if _, ok := p.hookMap[part.FormName()]; ok {
+		if hsc.IsHookExist(part.FormName()) {
 			_, err := hsc.HookEvent(part.FormName(), &normalParam{
 				r: part,
 				h: header,
