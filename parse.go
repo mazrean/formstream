@@ -1,7 +1,5 @@
 package formstream
 
-//go:generate go run github.com/golang/mock/mockgen -source=$GOFILE -destination=mock/${GOFILE} -package=mock
-
 import (
 	"bytes"
 	"errors"
@@ -9,12 +7,14 @@ import (
 	"io"
 	"mime/multipart"
 	"os"
+
+	conditionjudge "github.com/mazrean/formstream/internal/condition_judge"
 )
 
 func (p *Parser) Parse(r io.Reader) (err error) {
-	wh := newHookSatisfactionChecker(p.hookMap, p.maxMemFileSize)
+	hsc := newHookSatisfactionChecker(p.hookMap, p.maxMemFileSize)
 	defer func() {
-		deferErr := wh.Close()
+		deferErr := hsc.Close()
 		// capture the error of Close()
 		if deferErr != nil {
 			if err != nil {
@@ -25,12 +25,12 @@ func (p *Parser) Parse(r io.Reader) (err error) {
 		}
 	}()
 
-	err = p.parse(r, wh)
+	err = p.parse(r, hsc.IConditionJudger)
 
 	return err
 }
 
-func (p *Parser) parse(r io.Reader, wh iHookSatisfactionChecker) error {
+func (p *Parser) parse(r io.Reader, hsc conditionjudge.IConditionJudger[string, *normalParam, *abnoramlParam]) error {
 	mr := multipart.NewReader(r, p.boundary)
 	for {
 		var part *multipart.Part
@@ -42,8 +42,12 @@ func (p *Parser) parse(r io.Reader, wh iHookSatisfactionChecker) error {
 			return fmt.Errorf("failed to read next part: %w", err)
 		}
 
+		header := newHeader(part.Header)
 		if _, ok := p.hookMap[part.FormName()]; ok {
-			err := wh.runOrSetHook(part.FormName(), part)
+			_, err := hsc.HookEvent(part.FormName(), &normalParam{
+				r: part,
+				h: header,
+			})
 			if err != nil {
 				return fmt.Errorf("failed to run or set hook: %w", err)
 			}
@@ -55,11 +59,11 @@ func (p *Parser) parse(r io.Reader, wh iHookSatisfactionChecker) error {
 
 			p.valueMap[part.FormName()] = append(p.valueMap[part.FormName()], Value{
 				content: b.Bytes(),
-				header:  newHeader(part.Header),
+				header:  header,
 			})
 		}
 
-		err = wh.runSatisfiedHook(part.FormName())
+		err = hsc.KeyEvent(part.FormName())
 		if err != nil {
 			return fmt.Errorf("failed to run satisfied hook: %w", err)
 		}
@@ -68,200 +72,127 @@ func (p *Parser) parse(r io.Reader, wh iHookSatisfactionChecker) error {
 	return nil
 }
 
-type iHookSatisfactionChecker interface {
-	runOrSetHook(name string, part *multipart.Part) error
-	runSatisfiedHook(name string) error
+type hookSatisfactionChecker struct {
+	conditionjudge.IConditionJudger[string, *normalParam, *abnoramlParam]
+	preProcessor *preProcessor
 }
 
-type hookSatisfactionChecker struct {
-	satisfiedHooks   map[string]StreamHookFunc
-	unsatisfiedHooks map[string][]*waitHook
-	hookMap          map[string]*waitHook
+func newHookSatisfactionChecker(streamHooks map[string]streamHook, maxMemFileSize DataSize) *hookSatisfactionChecker {
+	judgeHooks := make(map[string]conditionjudge.Hook[string, *normalParam, *abnoramlParam], len(streamHooks))
+	for name, hook := range streamHooks {
+		h := judgeHook(hook)
+		judgeHooks[name] = &h
+	}
 
+	preProcess := &preProcessor{
+		maxMemFileSize: maxMemFileSize,
+	}
+
+	return &hookSatisfactionChecker{
+		IConditionJudger: conditionjudge.NewConditionJudger(judgeHooks, preProcess.run),
+		preProcessor:     preProcess,
+	}
+}
+
+func (wh *hookSatisfactionChecker) Close() error {
+	return wh.preProcessor.Close()
+}
+
+type normalParam struct {
+	r io.Reader
+	h Header
+}
+
+type abnoramlParam struct {
+	content io.ReadCloser
+	header  Header
+}
+
+type preProcessor struct {
 	maxMemFileSize DataSize
 	offset         int64
 	file           *os.File
 }
 
-func newHookSatisfactionChecker(streamHooks map[string]streamHook, maxMemFileSize DataSize) *hookSatisfactionChecker {
-	satisfiedHooks := make(map[string]StreamHookFunc, len(streamHooks))
-	unsatisfiedHooks := make(map[string][]*waitHook)
-	hookMap := make(map[string]*waitHook, len(streamHooks))
-	for name, hook := range streamHooks {
-		if len(hook.requireParts) == 0 {
-			satisfiedHooks[name] = hook.fn
-			continue
+func (pp *preProcessor) run(normalParam *normalParam) (*abnoramlParam, error) {
+	buf := bytes.NewBuffer(nil)
+	n, err := io.CopyN(buf, normalParam.r, int64(pp.maxMemFileSize)+1)
+	if err != nil && !errors.Is(err, io.EOF) {
+		return nil, fmt.Errorf("failed to copy: %w", err)
+	}
+
+	var content io.ReadCloser
+	if n > int64(pp.maxMemFileSize) {
+		if pp.file == nil {
+			f, err := os.CreateTemp("", "formstream-")
+			if err != nil {
+				return nil, fmt.Errorf("failed to create temp file: %w", err)
+			}
+			pp.file = f
 		}
 
-		waitHookValue := waitHook{
-			name:             name,
-			fn:               hook.fn,
-			unsatisfiedCount: len(hook.requireParts),
+		_, err := io.Copy(pp.file, buf)
+		if err != nil {
+			return nil, fmt.Errorf("failed to write: %w", err)
 		}
-		hookMap[name] = &waitHookValue
-		for _, requirePart := range hook.requireParts {
-			unsatisfiedHooks[requirePart] = append(unsatisfiedHooks[requirePart], &waitHookValue)
+
+		remainSize, err := io.Copy(pp.file, normalParam.r)
+		if err != nil {
+			return nil, fmt.Errorf("failed to copy: %w", err)
+		}
+
+		size := int64(buf.Len()) + remainSize
+		content = io.NopCloser(io.NewSectionReader(pp.file, pp.offset, size))
+		pp.offset += size
+	} else {
+		pp.maxMemFileSize -= DataSize(buf.Len())
+		content = customReadCloser{
+			Reader: buf,
+			closeFunc: func() error {
+				pp.maxMemFileSize += DataSize(buf.Len())
+				return nil
+			},
 		}
 	}
 
-	return &hookSatisfactionChecker{
-		satisfiedHooks:   satisfiedHooks,
-		unsatisfiedHooks: unsatisfiedHooks,
-		hookMap:          hookMap,
-		maxMemFileSize:   maxMemFileSize,
-	}
+	return &abnoramlParam{
+		content: content,
+		header:  normalParam.h,
+	}, nil
 }
 
-func (w *hookSatisfactionChecker) runOrSetHook(name string, part *multipart.Part) error {
-	header := newHeader(part.Header)
-
-	if fn := w.satisfiedHooks[name]; fn != nil {
-		err := fn(part, header)
-		if err != nil {
-			return fmt.Errorf("failed to execute hook: %w", err)
-		}
+func (pp *preProcessor) Close() error {
+	if pp.file == nil {
 		return nil
 	}
 
-	buf := bytes.NewBuffer(nil)
-	n, err := io.CopyN(buf, part, int64(w.maxMemFileSize)+1)
-	if err != nil && !errors.Is(err, io.EOF) {
-		return fmt.Errorf("failed to copy: %w", err)
-	}
-
-	var cntnt content
-	if n > int64(w.maxMemFileSize) {
-		if w.file == nil {
-			f, err := os.CreateTemp("", "formstream-")
-			if err != nil {
-				return fmt.Errorf("failed to create temp file: %w", err)
-			}
-			w.file = f
-		}
-
-		_, err := io.Copy(w.file, buf)
-		if err != nil {
-			return fmt.Errorf("failed to write: %w", err)
-		}
-
-		remainSize, err := io.Copy(w.file, part)
-		if err != nil {
-			return fmt.Errorf("failed to copy: %w", err)
-		}
-
-		cntnt = fileContent{
-			file:   w.file,
-			offset: w.offset,
-			size:   int64(buf.Len()) + remainSize,
-		}
-	} else {
-		cntnt = bytesContent{
-			content: buf.Bytes(),
-		}
-		w.maxMemFileSize -= DataSize(buf.Len())
-	}
-
-	if hook, ok := w.hookMap[name]; ok {
-		hook.callParams = append(hook.callParams, callParams{
-			content: cntnt,
-			header:  header,
-		})
-	} else {
-		// actually not reached
-		return fmt.Errorf("no such hook %s", name)
-	}
-
-	return nil
+	return pp.file.Close()
 }
 
-func (w *hookSatisfactionChecker) runSatisfiedHook(name string) error {
-	var errs []error
-	for _, hook := range w.unsatisfiedHooks[name] {
-		if hook.unsatisfiedCount <= 0 {
-			continue
-		}
-		hook.unsatisfiedCount--
-		if hook.unsatisfiedCount > 0 {
-			continue
-		}
-
-		w.satisfiedHooks[hook.name] = hook.fn
-
-		for _, param := range hook.callParams {
-			err := func() (err error) {
-				err = hook.fn(param.content.Reader(), param.header)
-				if err != nil {
-					return fmt.Errorf("failed to execute hook of %s: %v", hook.name, err)
-				}
-
-				w.maxMemFileSize += param.content.FreeMemSize()
-
-				return nil
-			}()
-			if err != nil {
-				errs = append(errs, err)
-			}
-		}
-
-		hook.callParams = nil
-	}
-	if len(errs) != 0 {
-		return errors.Join(errs...)
-	}
-
-	return nil
+type judgeHook struct {
+	fn           StreamHookFunc
+	requireParts []string
 }
 
-func (w *hookSatisfactionChecker) Close() error {
-	if w.file != nil {
-		err := w.file.Close()
-		if err != nil {
-			return fmt.Errorf("failed to close file: %w", err)
-		}
-	}
-
-	return nil
+func (jh judgeHook) NormalPath(normalParam *normalParam) error {
+	return jh.fn(normalParam.r, normalParam.h)
 }
 
-type waitHook struct {
-	name             string
-	fn               StreamHookFunc
-	callParams       []callParams
-	unsatisfiedCount int
+func (jh judgeHook) AbnormalPath(abnoramlParam *abnoramlParam) error {
+	defer abnoramlParam.content.Close()
+
+	return jh.fn(abnoramlParam.content, abnoramlParam.header)
 }
 
-type callParams struct {
-	content content
-	header  Header
+func (jh judgeHook) Requirements() []string {
+	return jh.requireParts
 }
 
-type content interface {
-	Reader() io.Reader
-	FreeMemSize() DataSize
+type customReadCloser struct {
+	io.Reader
+	closeFunc func() error
 }
 
-type bytesContent struct {
-	content []byte
-}
-
-func (c bytesContent) Reader() io.Reader {
-	return bytes.NewReader(c.content)
-}
-
-func (c bytesContent) FreeMemSize() DataSize {
-	return DataSize(len(c.content))
-}
-
-type fileContent struct {
-	file   io.ReaderAt
-	offset int64
-	size   int64
-}
-
-func (c fileContent) Reader() io.Reader {
-	return io.NewSectionReader(c.file, c.offset, c.size)
-}
-
-func (c fileContent) FreeMemSize() DataSize {
-	return 0
+func (cc customReadCloser) Close() error {
+	return cc.closeFunc()
 }
