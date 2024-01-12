@@ -1,5 +1,7 @@
 package conditionjudge
 
+//go:generate go run go.uber.org/mock/mockgen -source=$GOFILE -destination=mock/${GOFILE} -package=mock
+
 import (
 	"errors"
 	"fmt"
