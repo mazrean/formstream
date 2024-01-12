@@ -7,6 +7,7 @@ import (
 	"io"
 	"mime/multipart"
 	"os"
+	"sync"
 
 	conditionjudge "github.com/mazrean/formstream/internal/condition_judge"
 )
@@ -114,8 +115,16 @@ type preProcessor struct {
 	file           *os.File
 }
 
+var bufPool = sync.Pool{
+	New: func() interface{} {
+		return bytes.NewBuffer(nil)
+	},
+}
+
 func (pp *preProcessor) run(normalParam *normalParam) (*abnoramlParam, error) {
-	buf := bytes.NewBuffer(nil)
+	buf := bufPool.Get().(*bytes.Buffer)
+	buf.Reset()
+
 	n, err := io.CopyN(buf, normalParam.r, int64(pp.maxMemFileSize)+1)
 	if err != nil && !errors.Is(err, io.EOF) {
 		return nil, fmt.Errorf("failed to copy: %w", err)
@@ -144,11 +153,14 @@ func (pp *preProcessor) run(normalParam *normalParam) (*abnoramlParam, error) {
 		size := int64(buf.Len()) + remainSize
 		content = io.NopCloser(io.NewSectionReader(pp.file, pp.offset, size))
 		pp.offset += size
+
+		bufPool.Put(buf)
 	} else {
 		pp.maxMemFileSize -= DataSize(buf.Len())
 		content = customReadCloser{
 			Reader: buf,
 			closeFunc: func() error {
+				bufPool.Put(buf)
 				pp.maxMemFileSize += DataSize(buf.Len())
 				return nil
 			},
