@@ -29,7 +29,7 @@ large file contents
 
 	parser := formstream.NewParser("boundary")
 
-	parser.Register("stream", func(r io.Reader, header formstream.Header) error {
+	err := parser.Register("stream", func(r io.Reader, header formstream.Header) error {
 		fmt.Println("---stream---")
 		fmt.Printf("file name: %s\n", header.FileName())
 		fmt.Printf("Content-Type: %s\n", header.ContentType())
@@ -42,8 +42,11 @@ large file contents
 
 		return nil
 	})
+	if err != nil {
+		log.Fatal(err)
+	}
 
-	err := parser.Parse(buf)
+	err = parser.Parse(buf)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -72,10 +75,16 @@ func sampleForm(fileSize formstream.DataSize, boundary string, reverse bool) (io
 	mw := multipart.NewWriter(b)
 	defer mw.Close()
 
-	mw.SetBoundary(boundary)
+	err := mw.SetBoundary(boundary)
+	if err != nil {
+		return nil, fmt.Errorf("failed to set boundary: %w", err)
+	}
 
 	if !reverse {
-		mw.WriteField("field", "value")
+		err := mw.WriteField("field", "value")
+		if err != nil {
+			return nil, fmt.Errorf("failed to write field: %w", err)
+		}
 	}
 
 	mh := make(textproto.MIMEHeader)
@@ -91,7 +100,10 @@ func sampleForm(fileSize formstream.DataSize, boundary string, reverse bool) (io
 	}
 
 	if reverse {
-		mw.WriteField("field", "value")
+		err := mw.WriteField("field", "value")
+		if err != nil {
+			return nil, fmt.Errorf("failed to write field: %w", err)
+		}
 	}
 
 	return b, nil
@@ -136,7 +148,7 @@ func benchmarkFormstream(b *testing.B, fileSize formstream.DataSize, reverse boo
 
 		parser := formstream.NewParser(boundary)
 
-		parser.Register("stream", func(r io.Reader, header formstream.Header) error {
+		err = parser.Register("stream", func(r io.Reader, header formstream.Header) error {
 			// get field value
 			_, _, _ = parser.Value("field")
 
@@ -147,6 +159,9 @@ func benchmarkFormstream(b *testing.B, fileSize formstream.DataSize, reverse boo
 
 			return nil
 		}, formstream.WithRequiredPart("field"))
+		if err != nil {
+			b.Fatal(err)
+		}
 
 		err = parser.Parse(r)
 		if err != nil {
@@ -189,7 +204,12 @@ func benchmarkStdMultipart_ReadForm(b *testing.B, fileSize formstream.DataSize, 
 			if err != nil {
 				b.Fatal(err)
 			}
-			defer form.RemoveAll()
+			defer func() {
+				err := form.RemoveAll()
+				if err != nil {
+					b.Fatal(err)
+				}
+			}()
 
 			f, err := form.File["stream"][0].Open()
 			if err != nil {
