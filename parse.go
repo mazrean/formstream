@@ -140,7 +140,7 @@ func (pp *preProcessor) run(normalParam *normalParam) (*abnormalParam, error) {
 			pp.file = f
 		}
 
-		_, err := io.Copy(pp.file, buf)
+		bufSize, err := io.Copy(pp.file, buf)
 		if err != nil {
 			return nil, fmt.Errorf("failed to write: %w", err)
 		}
@@ -150,18 +150,19 @@ func (pp *preProcessor) run(normalParam *normalParam) (*abnormalParam, error) {
 			return nil, fmt.Errorf("failed to copy: %w", err)
 		}
 
-		size := int64(buf.Len()) + remainSize
+		size := bufSize + remainSize
 		content = io.NopCloser(io.NewSectionReader(pp.file, pp.offset, size))
 		pp.offset += size
 
 		bufPool.Put(buf)
 	} else {
 		pp.maxMemFileSize -= DataSize(buf.Len())
+		bufSize := buf.Len()
 		content = customReadCloser{
 			Reader: buf,
 			closeFunc: func() error {
 				bufPool.Put(buf)
-				pp.maxMemFileSize += DataSize(buf.Len())
+				pp.maxMemFileSize += DataSize(bufSize)
 				return nil
 			},
 		}
