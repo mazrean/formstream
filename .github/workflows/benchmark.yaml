@@ -44,6 +44,7 @@ jobs:
           \`\`\`sh
           gh api /repos/${{ github.repository }}/actions/artifacts/${{ steps.artifact.outputs.artifact-id }}/zip > /tmp/profile.zip
           unzip /tmp/profile.zip -d profile
+          rm -rf /tmp/profile.zip
           go tool pprof -http :6060 profile/cpu.out
           \`\`\`
           </details>
