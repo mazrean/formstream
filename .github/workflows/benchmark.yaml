@@ -45,6 +45,7 @@ jobs:
           </details>
           EOF
 
-          gh pr comment ${{ github.event.pull_request.number }} --edit-last -F ./body.txt --repo ${{ github.repository }}
+          gh pr comment ${{ github.event.pull_request.number }} --edit-last -F ./body.txt --repo ${{ github.repository }} ||
+            gh pr comment ${{ github.event.pull_request.number }} -F ./body.txt --repo ${{ github.repository }}
         env:
           GH_TOKEN: ${{ github.token }}
