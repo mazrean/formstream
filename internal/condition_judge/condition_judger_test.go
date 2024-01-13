@@ -42,6 +42,8 @@ func preProcessFunc(value string) (string, error) {
 }
 
 func TestConditionJudger(t *testing.T) {
+	t.Parallel()
+
 	type event struct {
 		eventType string
 		key       string

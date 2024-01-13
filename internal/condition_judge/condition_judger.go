@@ -1,7 +1,5 @@
 package conditionjudge
 
-//go:generate go run go.uber.org/mock/mockgen -source=$GOFILE -destination=mock/${GOFILE} -package=mock
-
 import (
 	"errors"
 	"fmt"
@@ -16,10 +14,10 @@ type IConditionJudger[K comparable, S any, T any] interface {
 // ConditionJudger If the condition is met, execute immediately; if not, wait until it is met and execute.
 type ConditionJudger[K comparable, S any, T any] struct {
 	// preProcessFunc Convert value conversions when conditions are not met
-	preProcessFunc   PreProcessFunc[S, T]
-	satisfiedHooks   map[K]func(S) error
-	unsatisfiedHooks map[K][]*waitHook[K, S, T]
-	hooks            map[K]*waitHook[K, S, T]
+	preProcessFunc     PreProcessFunc[S, T]
+	satisfiedHookMap   map[K]func(S) error
+	unsatisfiedHookMap map[K]*waitHook[K, S, T]
+	requirementHookMap map[K][]*waitHook[K, S, T]
 }
 
 type PreProcessFunc[S any, T any] func(S) (T, error)
@@ -39,14 +37,14 @@ type Hook[K comparable, S any, T any] interface {
 }
 
 func NewConditionJudger[K comparable, S any, T any](hookMap map[K]Hook[K, S, T], prepreProcessFunc PreProcessFunc[S, T]) *ConditionJudger[K, S, T] {
-	satisfiedHooks := make(map[K]func(S) error, len(hookMap))
-	unsatisfiedHooks := make(map[K][]*waitHook[K, S, T])
-	hooks := make(map[K]*waitHook[K, S, T], len(hookMap))
+	satisfiedHookMap := make(map[K]func(S) error, len(hookMap))
+	unsatisfiedHookMap := make(map[K]*waitHook[K, S, T])
+	requirementHookMap := make(map[K][]*waitHook[K, S, T])
 	for key, hook := range hookMap {
 		requirements := hook.Requirements()
 
 		if len(requirements) == 0 {
-			satisfiedHooks[key] = hook.NormalPath
+			satisfiedHookMap[key] = hook.NormalPath
 			continue
 		}
 
@@ -56,29 +54,33 @@ func NewConditionJudger[K comparable, S any, T any](hookMap map[K]Hook[K, S, T],
 			abnormalPathFunc: hook.AbnormalPath,
 			unsatisfiedCount: len(requirements),
 		}
-		hooks[key] = hookValue
+		unsatisfiedHookMap[key] = hookValue
 		for _, requirePart := range requirements {
-			unsatisfiedHooks[requirePart] = append(unsatisfiedHooks[requirePart], hookValue)
+			requirementHookMap[requirePart] = append(requirementHookMap[requirePart], hookValue)
 		}
 	}
 
 	return &ConditionJudger[K, S, T]{
-		preProcessFunc:   prepreProcessFunc,
-		satisfiedHooks:   satisfiedHooks,
-		unsatisfiedHooks: unsatisfiedHooks,
-		hooks:            hooks,
+		preProcessFunc:     prepreProcessFunc,
+		satisfiedHookMap:   satisfiedHookMap,
+		unsatisfiedHookMap: unsatisfiedHookMap,
+		requirementHookMap: requirementHookMap,
 	}
 }
 
 func (w *ConditionJudger[K, S, T]) IsHookExist(key K) bool {
-	_, ok := w.hooks[key]
+	if _, ok := w.satisfiedHookMap[key]; ok {
+		return true
+	}
+
+	_, ok := w.unsatisfiedHookMap[key]
 	return ok
 }
 
 var ErrNoHooks = errors.New("no hooks")
 
 func (w *ConditionJudger[K, S, T]) HookEvent(key K, value S) (bool, error) {
-	if fn := w.satisfiedHooks[key]; fn != nil {
+	if fn := w.satisfiedHookMap[key]; fn != nil {
 		err := fn(value)
 		if err != nil {
 			return false, fmt.Errorf("failed to execute hook: %w", err)
@@ -92,7 +94,7 @@ func (w *ConditionJudger[K, S, T]) HookEvent(key K, value S) (bool, error) {
 		return false, fmt.Errorf("failed to pre-process: %w", err)
 	}
 
-	hookValue, ok := w.hooks[key]
+	hookValue, ok := w.unsatisfiedHookMap[key]
 	if !ok {
 		return false, ErrNoHooks
 	}
@@ -102,7 +104,7 @@ func (w *ConditionJudger[K, S, T]) HookEvent(key K, value S) (bool, error) {
 }
 
 func (w *ConditionJudger[K, S, T]) KeyEvent(key K) error {
-	hooks := w.unsatisfiedHooks[key]
+	hooks := w.requirementHookMap[key]
 
 	var errs []error
 	for _, hook := range hooks {
@@ -114,7 +116,8 @@ func (w *ConditionJudger[K, S, T]) KeyEvent(key K) error {
 			continue
 		}
 
-		w.satisfiedHooks[hook.key] = hook.normalPathFunc
+		delete(w.unsatisfiedHookMap, hook.key)
+		w.satisfiedHookMap[hook.key] = hook.normalPathFunc
 
 		for _, param := range hook.callParams {
 			err := hook.abnormalPathFunc(param)
