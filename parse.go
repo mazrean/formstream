@@ -31,7 +31,7 @@ func (p *Parser) Parse(r io.Reader) (err error) {
 	return
 }
 
-func (p *Parser) parse(r io.Reader, hsc conditionjudge.IConditionJudger[string, *normalParam, *abnoramlParam]) error {
+func (p *Parser) parse(r io.Reader, hsc conditionjudge.IConditionJudger[string, *normalParam, *abnormalParam]) error {
 	mr := multipart.NewReader(r, p.boundary)
 	for {
 		var part *multipart.Part
@@ -74,12 +74,12 @@ func (p *Parser) parse(r io.Reader, hsc conditionjudge.IConditionJudger[string, 
 }
 
 type hookSatisfactionChecker struct {
-	conditionjudge.IConditionJudger[string, *normalParam, *abnoramlParam]
+	conditionjudge.IConditionJudger[string, *normalParam, *abnormalParam]
 	preProcessor *preProcessor
 }
 
 func newHookSatisfactionChecker(streamHooks map[string]streamHook, maxMemFileSize DataSize) *hookSatisfactionChecker {
-	judgeHooks := make(map[string]conditionjudge.Hook[string, *normalParam, *abnoramlParam], len(streamHooks))
+	judgeHooks := make(map[string]conditionjudge.Hook[string, *normalParam, *abnormalParam], len(streamHooks))
 	for name, hook := range streamHooks {
 		h := judgeHook(hook)
 		judgeHooks[name] = &h
@@ -104,7 +104,7 @@ type normalParam struct {
 	h Header
 }
 
-type abnoramlParam struct {
+type abnormalParam struct {
 	content io.ReadCloser
 	header  Header
 }
@@ -121,7 +121,7 @@ var bufPool = sync.Pool{
 	},
 }
 
-func (pp *preProcessor) run(normalParam *normalParam) (*abnoramlParam, error) {
+func (pp *preProcessor) run(normalParam *normalParam) (*abnormalParam, error) {
 	buf := bufPool.Get().(*bytes.Buffer)
 	buf.Reset()
 
@@ -167,7 +167,7 @@ func (pp *preProcessor) run(normalParam *normalParam) (*abnoramlParam, error) {
 		}
 	}
 
-	return &abnoramlParam{
+	return &abnormalParam{
 		content: content,
 		header:  normalParam.h,
 	}, nil
@@ -190,7 +190,7 @@ func (jh judgeHook) NormalPath(normalParam *normalParam) error {
 	return jh.fn(normalParam.r, normalParam.h)
 }
 
-func (jh judgeHook) AbnormalPath(abnoramlParam *abnoramlParam) error {
+func (jh judgeHook) AbnormalPath(abnoramlParam *abnormalParam) error {
 	defer abnoramlParam.content.Close()
 
 	return jh.fn(abnoramlParam.content, abnoramlParam.header)
