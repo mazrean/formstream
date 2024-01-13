@@ -15,8 +15,9 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
-      - run: mkdir -p ./profile
-      - run: |
+      - name: Run benchmark
+        run: |
+          mkdir -p ./profile
           {
             echo "stdout<<EOF"
             go test -benchmem -bench . -cpuprofile ./profile/cpu.out -memprofile ./profile/mem.out
@@ -28,7 +29,8 @@ jobs:
         with:
           name: profile
           path: profile
-      - run: |
+      - name: Comment
+        run: |
           cat << EOF > ./body.txt
           ## Benchmark Result
 
@@ -38,13 +40,17 @@ jobs:
 
           <details>
           <summary>pprof command</summary>
+
           \`\`\`sh
-          unzip <(gh api /repos/${{ github.repository }}/actions/artifacts/${{ steps.artifact.outputs.artifact-id }}/zip)
+          gh api /repos/${{ github.repository }}/actions/artifacts/${{ steps.artifact.outputs.artifact-id }}/zip > /tmp/profile.zip
+          unzip /tmp/profile.zip -d profile
+          rm -rf /tmp/profile.zip
           go tool pprof -http :6060 profile/cpu.out
           \`\`\`
           </details>
           EOF
 
-          gh pr comment ${{ github.event.pull_request.number }} --edit-last -F ./body.txt --repo ${{ github.repository }}
+          gh pr comment ${{ github.event.pull_request.number }} --edit-last -F ./body.txt --repo ${{ github.repository }} ||
+            gh pr comment ${{ github.event.pull_request.number }} -F ./body.txt --repo ${{ github.repository }}
         env:
           GH_TOKEN: ${{ github.token }}
