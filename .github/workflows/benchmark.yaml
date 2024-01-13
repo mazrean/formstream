@@ -1,0 +1,50 @@
+name: Benchmark
+
+on:
+  pull_request:
+
+jobs:
+  benchmark:
+    name: Benchmark
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - run: mkdir -p ./profile
+      - run: |
+          {
+            echo "stdout<<EOF"
+            go test -benchmem -bench . -cpuprofile ./profile/cpu.out -memprofile ./profile/mem.out
+            echo "EOF"
+          } >> $GITHUB_OUTPUT
+        id: bench
+      - uses: actions/upload-artifact@v4
+        id: artifact
+        with:
+          name: profile
+          path: profile
+      - run: |
+          cat << EOF > ./body.txt
+          ## Benchmark Result
+
+          \`\`\`text
+          ${{ steps.bench.outputs.stdout }}
+          \`\`\`
+
+          <details>
+          <summary>pprof command</summary>
+          \`\`\`sh
+          unzip <(gh api /repos/${{ github.repository }}/actions/artifacts/${{ steps.artifact.outputs.artifact-id }}/zip)
+          go tool pprof -http :6060 profile/cpu.out
+          \`\`\`
+          </details>
+          EOF
+
+          gh pr comment ${{ github.event.pull_request.number }} --edit-last -F ./body.txt --repo ${{ github.repository }}
+        env:
+          GH_TOKEN: ${{ github.token }}
