@@ -15,8 +15,9 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
-      - run: mkdir -p ./profile
-      - run: |
+      - name: Run benchmark
+        run: |
+          mkdir -p ./profile
           {
             echo "stdout<<EOF"
             go test -benchmem -bench . -cpuprofile ./profile/cpu.out -memprofile ./profile/mem.out
@@ -28,7 +29,8 @@ jobs:
         with:
           name: profile
           path: profile
-      - run: |
+      - name: Comment
+        run: |
           cat << EOF > ./body.txt
           ## Benchmark Result
 
