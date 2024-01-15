@@ -1,4 +1,4 @@
-package gin
+package ginform
 
 import (
 	"io"
@@ -15,7 +15,7 @@ type Parser struct {
 }
 
 func NewParser(c *gin.Context, options ...formstream.ParserOption) (*Parser, error) {
-	contentType := c.ContentType()
+	contentType := c.GetHeader("Content-Type")
 	d, params, err := mime.ParseMediaType(contentType)
 	if err != nil || d != "multipart/form-data" {
 		return nil, http.ErrNotMultipart

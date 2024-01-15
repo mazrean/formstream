@@ -1,4 +1,4 @@
-package http
+package httpform
 
 import (
 	"io"

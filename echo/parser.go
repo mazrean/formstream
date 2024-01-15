@@ -1,4 +1,4 @@
-package echo
+package echoform
 
 import (
 	"io"
