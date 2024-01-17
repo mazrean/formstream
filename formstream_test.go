@@ -109,35 +109,37 @@ func sampleForm(fileSize formstream.DataSize, boundary string, reverse bool) (io
 	return b, nil
 }
 
-func BenchmarkFormstream(b *testing.B) {
+func BenchmarkFormStreamFastPath(b *testing.B) {
 	b.Run("1MB", func(b *testing.B) {
-		benchmarkFormstream(b, 1*formstream.MB, false)
+		benchmarkFormStream(b, 1*formstream.MB, false)
 	})
 	b.Run("10MB", func(b *testing.B) {
-		benchmarkFormstream(b, 10*formstream.MB, false)
+		benchmarkFormStream(b, 10*formstream.MB, false)
 	})
 	b.Run("100MB", func(b *testing.B) {
-		benchmarkFormstream(b, 100*formstream.MB, false)
+		benchmarkFormStream(b, 100*formstream.MB, false)
 	})
 	b.Run("1GB", func(b *testing.B) {
-		benchmarkFormstream(b, 1*formstream.GB, false)
-	})
-
-	b.Run("1MB Reverse", func(b *testing.B) {
-		benchmarkFormstream(b, 1*formstream.MB, true)
-	})
-	b.Run("10MB Reverse", func(b *testing.B) {
-		benchmarkFormstream(b, 10*formstream.MB, true)
-	})
-	b.Run("100MB Reverse", func(b *testing.B) {
-		benchmarkFormstream(b, 100*formstream.MB, true)
-	})
-	b.Run("1GB Reverse", func(b *testing.B) {
-		benchmarkFormstream(b, 1*formstream.GB, true)
+		benchmarkFormStream(b, 1*formstream.GB, false)
 	})
 }
 
-func benchmarkFormstream(b *testing.B, fileSize formstream.DataSize, reverse bool) {
+func BenchmarkFormStreamSlowPath(b *testing.B) {
+	b.Run("1MB", func(b *testing.B) {
+		benchmarkFormStream(b, 1*formstream.MB, true)
+	})
+	b.Run("10MB", func(b *testing.B) {
+		benchmarkFormStream(b, 10*formstream.MB, true)
+	})
+	b.Run("100MB", func(b *testing.B) {
+		benchmarkFormStream(b, 100*formstream.MB, true)
+	})
+	b.Run("1GB", func(b *testing.B) {
+		benchmarkFormStream(b, 1*formstream.GB, true)
+	})
+}
+
+func benchmarkFormStream(b *testing.B, fileSize formstream.DataSize, reverse bool) {
 	for i := 0; i < b.N; i++ {
 		b.StopTimer()
 		r, err := sampleForm(fileSize, boundary, reverse)
