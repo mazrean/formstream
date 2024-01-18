@@ -31,8 +31,8 @@ Across all file sizes, FormStream outperforms the [`mime/multipart`](https://pkg
 ![](./docs/images/time.png)
 
 > [!NOTE]
-> FormStream excels in speed by employing a stream for parsing multipart data that meets specific conditions (as shown in the 'FastPath' on the graph).
-> It remains significantly efficient even under less ideal conditions ('SlowPath' on the graph), marginally outperforming [`mime/multipart`](https://pkg.go.dev/mime/multipart).
+> FormStream excels in speed by employing a stream for parsing multipart data that meets specific conditions (as shown in the `FastPath` on the graph).
+> It remains significantly efficient even under less ideal conditions (`SlowPath` on the graph), marginally outperforming [`mime/multipart`](https://pkg.go.dev/mime/multipart).
 > For more details, see [Technical Overview](./#technical-overview).
 
 ## Installation
@@ -92,9 +92,11 @@ if err != nil {
 
 FormStream offers wrappers for popular web frameworks:
 
-- [net/http](./http)
-- [Echo](./echo)
-- [Gin](./gin)
+|Framework|Integration Package|
+|-|-|
+|[net/http](https://pkg.go.dev/net/http)|[httpform](./http)|
+|[Echo](https://echo.labstack.com/)|[echoform](./echo)|
+|[Gin](https://gin-gonic.com/)|[ginform](./gin)|
 
 ## Technical Overview
 
