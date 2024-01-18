@@ -88,7 +88,7 @@ var (
 	}{}
 )
 
-func saveUser(ctx context.Context, name string, password string, iconReader io.Reader) error {
+func saveUser(_ context.Context, name string, password string, iconReader io.Reader) error {
 	user.name = name
 	user.password = password
 

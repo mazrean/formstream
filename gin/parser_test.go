@@ -70,7 +70,10 @@ func createUserHandler(c *gin.Context) {
 		return saveUser(c.Request.Context(), name, password, r)
 	}, formstream.WithRequiredPart("name"), formstream.WithRequiredPart("password"))
 	if err != nil {
-		c.Error(err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "failed to register",
+		})
+		log.Println(err)
 		return
 	}
 
@@ -92,7 +95,7 @@ var (
 	}{}
 )
 
-func saveUser(ctx context.Context, name string, password string, iconReader io.Reader) error {
+func saveUser(_ context.Context, name string, password string, iconReader io.Reader) error {
 	user.name = name
 	user.password = password
 
