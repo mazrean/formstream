@@ -1,5 +1,7 @@
 import sys
+import os.path as path
 import matplotlib.pyplot as plt
+import numpy as np
 
 
 def parse_group(group: str):
@@ -24,7 +26,9 @@ def parse_file_size(mem_size: str):
         raise Exception("Unknown memory size: " + mem_size)
 
 
-results = {}
+file_sizes = []
+time_per_ops = {}
+mem_per_ops = {}
 for line in sys.stdin:
     if not line.startswith("Benchmark"):
         continue
@@ -35,39 +39,55 @@ for line in sys.stdin:
 
     group = parse_group(name_list[0])
 
-    results.setdefault(
-        group,
-        {
-            "file_size": [],
-            "time_per_ops": [],
-            "mem_per_ops": [],
-        },
+    file_size = name_list[1].split("-")[0]
+    file_sizes.append(file_size)
+
+    time_per_ops.setdefault(group, {})
+    time_per_ops[group][file_size] = int(tokens[2])
+
+    mem_per_ops.setdefault(group, {})
+    mem_per_ops[group][file_size] = int(tokens[4])
+
+# remove duplicates
+file_sizes = sorted(set(file_sizes), key=file_sizes.index)
+
+bar_width = 0.25
+
+index = np.arange(len(file_sizes))
+fig, ax_time = plt.subplots(figsize=(12, 7))
+for i, (group, group_time_dict) in enumerate(time_per_ops.items()):
+    ax_time.bar(
+        index + i * bar_width,
+        [group_time_dict[fs] / 1e6 for fs in file_sizes],
+        bar_width,
+        label=group,
     )
 
-    str_file_size = name_list[1].split("-")[0]
-    file_size = parse_file_size(str_file_size)
-    results[group]["file_size"].append(file_size)
+ax_time.set_xlabel("File Size")
+ax_time.set_ylabel("Execution Time (ms)")
+ax_time.set_title("Execution Time Comparison (Log Scale)")
+ax_time.set_xticks(index + bar_width)
+ax_time.set_xticklabels(file_sizes)
+ax_time.set_yscale("log")
+ax_time.legend()
 
-    time_per_ops = int(tokens[2])
-    results[group]["time_per_ops"].append(time_per_ops)
+fig.savefig(path.join(path.dirname(__file__), "../docs/images/time.png"))
 
-    mem_per_ops = int(tokens[4])
-    results[group]["mem_per_ops"].append(mem_per_ops)
+fig, ax_memory = plt.subplots(figsize=(12, 7))
+for i, (group, group_mem_dict) in enumerate(mem_per_ops.items()):
+    ax_memory.bar(
+        index + i * bar_width,
+        [group_mem_dict[fs] for fs in file_sizes],
+        bar_width,
+        label=group,
+    )
 
-time_per_ops_plt = plt.subplot(2, 1, 1)
-mem_per_ops_plt = plt.subplot(2, 1, 2)
-for group, result in results.items():
-    time_per_ops_plt.plot(result["file_size"], result["time_per_ops"], label=group)
-    mem_per_ops_plt.plot(result["file_size"], result["mem_per_ops"], label=group)
+ax_memory.set_xlabel("File Size")
+ax_memory.set_ylabel("Memory Usage (Bytes)")
+ax_memory.set_title("Memory Usage Comparison (Log Scale)")
+ax_memory.set_xticks(index + bar_width)
+ax_memory.set_xticklabels(file_sizes)
+ax_memory.set_yscale("log")
+ax_memory.legend()
 
-time_per_ops_plt.set_title("Time per operation")
-time_per_ops_plt.set_xlabel("File size (MB)")
-time_per_ops_plt.set_ylabel("Time per operation (ns)")
-time_per_ops_plt.legend()
-
-mem_per_ops_plt.set_title("Memory per operation")
-mem_per_ops_plt.set_xlabel("File size (MB)")
-mem_per_ops_plt.set_ylabel("Memory per operation (B)")
-mem_per_ops_plt.legend()
-
-plt.show()
+fig.savefig(path.join(path.dirname(__file__), "../docs/images/memory.png"))

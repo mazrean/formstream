@@ -1,6 +1,28 @@
 # Wrapper for [net/http](https://pkg.go.dev/net/http)
 
 ## Usage
+
+<details>
+<summary>Example data</summary>
+
+```text
+--boundary
+Content-Disposition: form-data; name="name"
+
+mazrean
+--boundary
+Content-Disposition: form-data; name="password"
+
+password
+--boundary
+Content-Disposition: form-data; name="icon"; filename="icon.png"
+Content-Type: image/png
+
+icon contents
+--boundary--
+```
+</details>
+
 ```go
 func createUserHandler(res http.ResponseWriter, req *http.Request) {
 	parser, err := httpform.NewParser(req)
