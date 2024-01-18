@@ -98,7 +98,11 @@ Use wrapper for each library.
 
 ## How it works
 
-multipart is data in the following format.
+FormStream offers an improved approach to processing multipart data, a format commonly utilized in web form submissions and file uploads.
+
+### Understanding Multipart Data
+Multipart data is organized with distinct boundaries separating each segment. Consider the following example:
+
 ```text
 --boundary
 Content-Disposition: form-data; name="description"
@@ -111,15 +115,12 @@ Content-Type: image/png
 large png data...
 --boundary--
 ```
-In this case, the file part is large and should be streamed as much as possible.
-In the case of the above data, stream processing can be performed by processing the data in order from the beginning.
-Such processing can be achieved by the `(*Reader).NextPart` method of `mime/multipart`.
 
-In `mime/multipart`, the `(*Reader).ReadForm` method can also parse a multipart.
-This method does not do stream processing, but saves the data once 
-in memory or a file and is slow.
-However, `net/http`, `Echo`, and `Gin` use the `(*Reader).ReadForm` method to parse multipart.
-This is because even if you need the data in description to process a file, you need to process the following data.
+When dealing with large files, streaming the data is essential for effective memory management. In the example above, streaming is implemented by sequentially processing each part from the beginning, a task accomplished with the `(*Reader).NextPart` method found in the `mime/multipart` package.
+
+### Alternative Parsing Method
+`mime/multipart` also includes the `(*Reader).ReadForm` method for parsing multipart data. Unlike the streaming approach, `(*Reader).ReadForm` temporarily saves the data in memory or a file, leading to slower processing. This method is prevalently used in web frameworks such as `net/http`, `Echo`, and `Gin`, particularly because it can manage parts arriving in a non-sequential order. For instance:
+
 ```text
 --boundary
 Content-Disposition: form-data; name="file"; filename="large.png"
@@ -132,10 +133,14 @@ Content-Disposition: form-data; name="description"
 file description
 --boundary--
 ```
-NextPart` can only process in order from the beginning, so in such cases, the data must be saved once to disk or memory.
 
-In summary, the multipart format can be processed efficiently and safely as follows
-- When the data necessary to process a Part is available, perform Stream processing as in the `(*Reader).NextPart` method.
-- If data necessary to process a Part is not available, write it to disk or memory and process it when it is available, as in the `(*Reader).ReadForm` method.
+With `NextPart`, processing is strictly sequential. If later parts (e.g., 'description') contain information required to process earlier parts (e.g., a large file), the data must be temporarily stored on disk or in memory.
 
-FormStream achieves this behavior faster than the `(*Reader).ReadForm` method, and unlike the `(*Reader).NextPart` method, it can process arbitrary multipart data.
+### Efficient Processing Strategies
+The most efficient strategies for handling multipart data include:
+- Stream processing with `(*Reader).NextPart` when the necessary data for a part is readily available.
+- Temporarily storing data on disk or in memory, then processing it as needed with `(*Reader).ReadForm` when required data for a part is initially unavailable.
+
+### Advantages of FormStream
+FormStream optimizes this workflow. It is faster than the `(*Reader).ReadForm` method and more flexible than `(*Reader).NextPart`, as it can process multipart data in any sequence. This versatility makes FormStream an ideal solution for various multipart data handling scenarios.
+
