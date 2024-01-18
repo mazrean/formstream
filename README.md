@@ -5,20 +5,20 @@
 [![codecov](https://codecov.io/gh/mazrean/formstream/branch/master/graph/badge.svg)](https://codecov.io/gh/mazrean/formstream)
 [![Go Reference](https://pkg.go.dev/badge/github.com/mazrean/formstream.svg)](https://pkg.go.dev/github.com/mazrean/formstream)
 
-FormStream is a Golang streaming parser for multipart.
+FormStream is a Golang streaming parser for multipart data, primarily used in web form submissions and file uploads.
 
 ## Features
 
-- Streaming parser, no need to store the whole file in memory or on disk in most cases
-- Extremely low memory usage
-- Fast, fast, fast!
+- Provides a streaming parser, eliminating the need to store entire files in memory or on disk in most cases.
+- Boasts extremely low memory usage.
+- Delivers high performance, significantly faster than traditional methods.
 
 ## Benchmarks
 
-For all file sizes, FormStream is faster and uses less memory than [`mime/multipartform`](https://pkg.go.dev/mime/multipart).
+Across all file sizes, FormStream outperforms the [`mime/multipart`](https://pkg.go.dev/mime/multipart) in both speed and memory efficiency.
 
 <details>
-<summary>Environment</summary>
+<summary>Testing Environment</summary>
 
 - OS:
 - CPU:
@@ -31,11 +31,11 @@ For all file sizes, FormStream is faster and uses less memory than [`mime/multip
 ![](./docs/images/time.png)
 
 > [!NOTE]
-> FormStream is extremely fast by using a stream when parsing a multipart that satisfies certain conditions (FastPath in the graph).
-> It is fast enough even when no conditions are met (SlowPath in the graph), but only slightly faster than `mime/multipart`.
-> If you want to know more details, see [How it works](./#how-it-works).
+> FormStream excels in speed by employing a stream for parsing multipart data that meets specific conditions (as shown in the 'FastPath' on the graph).
+> It remains significantly efficient even under less ideal conditions ('SlowPath' on the graph), marginally outperforming [`mime/multipart`](https://pkg.go.dev/mime/multipart).
+> For more details, see [Technical Overview](./#technical-overview).
 
-## Install
+## Installation
 
 ```sh
 go get github.com/mazrean/formstream@latest
@@ -43,10 +43,10 @@ go get github.com/mazrean/formstream@latest
 
 ## Usage
 
-### Basic
+### Basic Usage
 
 <details>
-<summary>Example data</summary>
+<summary>Example Data</summary>
 
 ```text
 --boundary
@@ -88,20 +88,21 @@ if err != nil {
 }
 ```
 
-### `net/http`, `Echo`, `Gin`
+### Integration with Web Frameworks
 
-Use wrapper for each library.
+FormStream offers wrappers for popular web frameworks:
 
 - [net/http](./http)
 - [Echo](./echo)
 - [Gin](./gin)
 
-## How it works
+## Technical Overview
 
-FormStream offers an improved approach to processing multipart data, a format commonly utilized in web form submissions and file uploads.
+FormStream introduces a more efficient method for processing multipart data. 
 
 ### Understanding Multipart Data
-Multipart data is organized with distinct boundaries separating each segment. Consider the following example:
+
+Multipart data is organized with defined boundaries separating each segment. Here's an example:
 
 ```text
 --boundary
@@ -116,10 +117,11 @@ large png data...
 --boundary--
 ```
 
-When dealing with large files, streaming the data is essential for effective memory management. In the example above, streaming is implemented by sequentially processing each part from the beginning, a task accomplished with the `(*Reader).NextPart` method found in the `mime/multipart` package.
+For large files, streaming the data is vital for efficient memory usage. In the example above, streaming is made possible by sequentially processing each part from the beginning, which can be achieved using the [`(*Reader).NextPart`](https://pkg.go.dev/mime/multipart#Reader.NextPart) method in the [`mime/multipart`](https://pkg.go.dev/mime/multipart) package.
 
 ### Alternative Parsing Method
-`mime/multipart` also includes the `(*Reader).ReadForm` method for parsing multipart data. Unlike the streaming approach, `(*Reader).ReadForm` temporarily saves the data in memory or a file, leading to slower processing. This method is prevalently used in web frameworks such as `net/http`, `Echo`, and `Gin`, particularly because it can manage parts arriving in a non-sequential order. For instance:
+
+The [`mime/multipart`](https://pkg.go.dev/mime/multipart) package also includes the [`(*Reader).ReadForm`](https://pkg.go.dev/mime/multipart#Reader.ReadForm) method. Unlike streaming, this method stores data temporarily in memory or on a file, leading to slower processing. It's widely used in frameworks like `net/http`, `Echo`, and `Gin` due to its ability to handle parts in any order. For instance:
 
 ```text
 --boundary
@@ -134,13 +136,14 @@ file description
 --boundary--
 ```
 
-With `NextPart`, processing is strictly sequential. If later parts (e.g., 'description') contain information required to process earlier parts (e.g., a large file), the data must be temporarily stored on disk or in memory.
+With [`(*Reader).NextPart`](https://pkg.go.dev/mime/multipart#Reader.NextPart), processing strictly follows sequential order, making it challenging to handle such data where later parts contain information necessary for processing earlier ones.
 
 ### Efficient Processing Strategies
-The most efficient strategies for handling multipart data include:
-- Stream processing with `(*Reader).NextPart` when the necessary data for a part is readily available.
-- Temporarily storing data on disk or in memory, then processing it as needed with `(*Reader).ReadForm` when required data for a part is initially unavailable.
+
+Optimal multipart handling strategies include:
+- Stream processing with [`(*Reader).NextPart`](https://pkg.go.dev/mime/multipart#Reader.NextPart) when all necessary data is immediately available.
+- Temporarily storing data on disk or memory, then processing it with [`(*Reader).ReadForm`](https://pkg.go.dev/mime/multipart#Reader.ReadForm) when needed.
 
 ### Advantages of FormStream
-FormStream optimizes this workflow. It is faster than the `(*Reader).ReadForm` method and more flexible than `(*Reader).NextPart`, as it can process multipart data in any sequence. This versatility makes FormStream an ideal solution for various multipart data handling scenarios.
 
+FormStream enhances this process. It outpaces the [`(*Reader).ReadForm`](https://pkg.go.dev/mime/multipart#Reader.ReadForm) method and, unlike [`(*Reader).NextPart`](https://pkg.go.dev/mime/multipart#Reader.NextPart), can handle multipart data in any order. This adaptability makes FormStream suitable for a range of multipart data scenarios.
