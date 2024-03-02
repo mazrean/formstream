@@ -209,7 +209,7 @@ func TestParser_Parse(t *testing.T) {
 				"field1Value\n" +
 				"--boundary--\n",
 			outputValueMap: map[string][]Value{},
-			mockSetup:      func(m *mock.MockIConditionJudger[string, *normalParam, *abnormalParam]) {},
+			mockSetup:      func(_ *mock.MockIConditionJudger[string, *normalParam, *abnormalParam]) {},
 			err:            ErrTooManyHeaders,
 		},
 		{
