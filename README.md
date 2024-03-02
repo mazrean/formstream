@@ -20,11 +20,11 @@ Across all file sizes, FormStream outperforms the [`mime/multipart`](https://pkg
 <details>
 <summary>Testing Environment</summary>
 
-- OS:
-- CPU:
-- RAM:
-- Disk:
-- Go version:
+- OS: Ubuntu 22.04.2 LTS(WSL2 on Windows 11 Home)
+- CPU: AMD Ryzen 9 7950X 16-Core Processor
+- RAM: 32GB
+- Disk: 512GB
+- Go version: 1.22.0
 </details>
 
 ![](./docs/images/memory.png)
