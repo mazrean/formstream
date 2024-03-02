@@ -7,29 +7,35 @@ import (
 )
 
 type Parser struct {
-	boundary       string
-	maxMemFileSize DataSize
-	valueMap       map[string][]Value
-	hookMap        map[string]streamHook
+	boundary string
+	valueMap map[string][]Value
+	hookMap  map[string]streamHook
+	parserConfig
 }
 
 func NewParser(boundary string, options ...ParserOption) *Parser {
-	c := &parserConfig{
+	c := parserConfig{
+		maxParts:       defaultMaxParts,
+		maxHeaders:     defaultMaxHeaders,
+		maxMemSize:     defaultMaxMemSize,
 		maxMemFileSize: defaultMaxMemFileSize,
 	}
 	for _, opt := range options {
-		opt(c)
+		opt(&c)
 	}
 
 	return &Parser{
-		boundary:       boundary,
-		maxMemFileSize: c.maxMemFileSize,
-		valueMap:       make(map[string][]Value),
-		hookMap:        make(map[string]streamHook),
+		boundary:     boundary,
+		valueMap:     make(map[string][]Value),
+		hookMap:      make(map[string]streamHook),
+		parserConfig: c,
 	}
 }
 
 type parserConfig struct {
+	maxParts       uint
+	maxHeaders     uint
+	maxMemSize     DataSize
 	maxMemFileSize DataSize
 }
 
@@ -44,7 +50,30 @@ const (
 	GB
 )
 
-const defaultMaxMemFileSize = 32 * MB
+const (
+	defaultMaxParts       = 10000
+	defaultMaxHeaders     = 10000
+	defaultMaxMemSize     = 32 * MB
+	defaultMaxMemFileSize = 32 * MB
+)
+
+func WithMaxParts(maxParts uint) ParserOption {
+	return func(c *parserConfig) {
+		c.maxParts = maxParts
+	}
+}
+
+func WithMaxHeaders(maxHeaders uint) ParserOption {
+	return func(c *parserConfig) {
+		c.maxHeaders = maxHeaders
+	}
+}
+
+func WithMaxMemSize(maxMemSize DataSize) ParserOption {
+	return func(c *parserConfig) {
+		c.maxMemSize = maxMemSize
+	}
+}
 
 func WithMaxMemFileSize(maxMemFileSize DataSize) ParserOption {
 	return func(c *parserConfig) {
