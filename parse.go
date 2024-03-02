@@ -12,8 +12,17 @@ import (
 	conditionjudge "github.com/mazrean/formstream/internal/condition_judge"
 )
 
+var (
+	// ErrTooManyParts is returned when the parts are more than MaxParts.
+	ErrTooManyParts = errors.New("too many parts")
+	// ErrTooManyHeaders is returned when the headers are more than MaxHeaders.
+	ErrTooManyHeaders = errors.New("too many headers")
+	// ErrTooLargeForm is returned when the form is too large for the parser to handle within the memory limit.
+	ErrTooLargeForm = errors.New("too large form")
+)
+
 func (p *Parser) Parse(r io.Reader) (err error) {
-	hsc := newHookSatisfactionChecker(p.hookMap, p.maxMemFileSize)
+	hsc := newHookSatisfactionChecker(p.hookMap, &p.parserConfig)
 	defer func() {
 		deferErr := hsc.Close()
 		// capture the error of Close()
@@ -43,6 +52,18 @@ func (p *Parser) parse(r io.Reader, hsc conditionjudge.IConditionJudger[string, 
 			return fmt.Errorf("failed to read next part: %w", err)
 		}
 
+		if p.maxParts == 0 {
+			return ErrTooManyParts
+		}
+		p.maxParts--
+
+		for _, header := range part.Header {
+			if p.maxHeaders < uint(len(header)) {
+				return ErrTooManyHeaders
+			}
+			p.maxHeaders -= uint(len(header))
+		}
+
 		header := newHeader(part.Header)
 		if hsc.IsHookExist(part.FormName()) {
 			_, err := hsc.HookEvent(part.FormName(), &normalParam{
@@ -53,10 +74,22 @@ func (p *Parser) parse(r io.Reader, hsc conditionjudge.IConditionJudger[string, 
 				return fmt.Errorf("failed to run or set hook: %w", err)
 			}
 		} else {
-			b := bytes.NewBuffer(nil)
-			if _, err := io.Copy(b, part); err != nil {
+			b := new(bytes.Buffer)
+
+			if DataSize(len(part.FormName())) > p.maxMemSize {
+				return ErrTooLargeForm
+			}
+			p.maxMemSize -= DataSize(len(part.FormName()))
+
+			n, err := io.Copy(b, part)
+			if err != nil {
 				return fmt.Errorf("failed to copy part: %w", err)
 			}
+
+			if uint64(n) > uint64(p.maxMemSize) {
+				return ErrTooLargeForm
+			}
+			p.maxMemSize -= DataSize(n)
 
 			p.valueMap[part.FormName()] = append(p.valueMap[part.FormName()], Value{
 				content: b.Bytes(),
@@ -78,7 +111,7 @@ type hookSatisfactionChecker struct {
 	preProcessor *preProcessor
 }
 
-func newHookSatisfactionChecker(streamHooks map[string]streamHook, maxMemFileSize DataSize) *hookSatisfactionChecker {
+func newHookSatisfactionChecker(streamHooks map[string]streamHook, config *parserConfig) *hookSatisfactionChecker {
 	judgeHooks := make(map[string]conditionjudge.Hook[string, *normalParam, *abnormalParam], len(streamHooks))
 	for name, hook := range streamHooks {
 		h := judgeHook(hook)
@@ -86,7 +119,7 @@ func newHookSatisfactionChecker(streamHooks map[string]streamHook, maxMemFileSiz
 	}
 
 	preProcess := &preProcessor{
-		maxMemFileSize: maxMemFileSize,
+		config: config,
 	}
 
 	return &hookSatisfactionChecker{
@@ -110,14 +143,14 @@ type abnormalParam struct {
 }
 
 type preProcessor struct {
-	maxMemFileSize DataSize
-	offset         int64
-	file           *os.File
+	config *parserConfig
+	offset int64
+	file   *os.File
 }
 
 var bufPool = sync.Pool{
 	New: func() interface{} {
-		return bytes.NewBuffer(nil)
+		return new(bytes.Buffer)
 	},
 }
 
@@ -125,13 +158,13 @@ func (pp *preProcessor) run(normalParam *normalParam) (*abnormalParam, error) {
 	buf := bufPool.Get().(*bytes.Buffer)
 	buf.Reset()
 
-	n, err := io.CopyN(buf, normalParam.r, int64(pp.maxMemFileSize)+1)
+	n, err := io.CopyN(buf, normalParam.r, min(int64(pp.config.maxMemFileSize), int64(pp.config.maxMemSize))+1)
 	if err != nil && !errors.Is(err, io.EOF) {
 		return nil, fmt.Errorf("failed to copy: %w", err)
 	}
 
 	var content io.ReadCloser
-	if n > int64(pp.maxMemFileSize) {
+	if n > int64(pp.config.maxMemFileSize) || n > int64(pp.config.maxMemSize) {
 		if pp.file == nil {
 			f, err := os.CreateTemp("", "formstream-")
 			if err != nil {
@@ -156,13 +189,15 @@ func (pp *preProcessor) run(normalParam *normalParam) (*abnormalParam, error) {
 
 		bufPool.Put(buf)
 	} else {
-		pp.maxMemFileSize -= DataSize(buf.Len())
+		pp.config.maxMemSize -= DataSize(buf.Len())
+		pp.config.maxMemFileSize -= DataSize(buf.Len())
 		bufSize := buf.Len()
 		content = customReadCloser{
 			Reader: buf,
 			closeFunc: func() error {
 				bufPool.Put(buf)
-				pp.maxMemFileSize += DataSize(bufSize)
+				pp.config.maxMemSize += DataSize(bufSize)
+				pp.config.maxMemFileSize += DataSize(bufSize)
 				return nil
 			},
 		}
