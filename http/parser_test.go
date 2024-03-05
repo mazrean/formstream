@@ -269,9 +269,15 @@ func BenchmarkFormStreamFastPath(b *testing.B) {
 		benchmarkFormStream(b, 1*formstream.GB, false)
 	})
 	b.Run("5GB", func(b *testing.B) {
+		if testing.Short() {
+			b.Skip("skipping test in short mode.")
+		}
 		benchmarkFormStream(b, 5*formstream.GB, false)
 	})
 	b.Run("10GB", func(b *testing.B) {
+		if testing.Short() {
+			b.Skip("skipping test in short mode.")
+		}
 		benchmarkFormStream(b, 10*formstream.GB, false)
 	})
 }
@@ -290,9 +296,15 @@ func BenchmarkFormStreamSlowPath(b *testing.B) {
 		benchmarkFormStream(b, 1*formstream.GB, true)
 	})
 	b.Run("5GB", func(b *testing.B) {
+		if testing.Short() {
+			b.Skip("skipping test in short mode.")
+		}
 		benchmarkFormStream(b, 5*formstream.GB, true)
 	})
 	b.Run("10GB", func(b *testing.B) {
+		if testing.Short() {
+			b.Skip("skipping test in short mode.")
+		}
 		benchmarkFormStream(b, 10*formstream.GB, true)
 	})
 }
@@ -371,7 +383,16 @@ func BenchmarkStdMultipartReadForm(b *testing.B) {
 		benchmarkStdMultipartReadForm(b, 1*formstream.GB)
 	})
 	b.Run("5GB", func(b *testing.B) {
+		if testing.Short() {
+			b.Skip("skipping test in short mode.")
+		}
 		benchmarkStdMultipartReadForm(b, 5*formstream.GB)
+	})
+	b.Run("10GB", func(b *testing.B) {
+		if testing.Short() {
+			b.Skip("skipping test in short mode.")
+		}
+		benchmarkStdMultipartReadForm(b, 10*formstream.GB)
 	})
 }
 
