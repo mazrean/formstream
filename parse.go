@@ -155,7 +155,10 @@ var bufPool = sync.Pool{
 }
 
 func (pp *preProcessor) run(normalParam *normalParam) (*abnormalParam, error) {
-	buf := bufPool.Get().(*bytes.Buffer)
+	buf, ok := bufPool.Get().(*bytes.Buffer)
+	if !ok {
+		buf = new(bytes.Buffer)
+	}
 	buf.Reset()
 
 	memLimit := min(pp.config.maxMemFileSize, pp.config.maxMemSize)

@@ -358,27 +358,27 @@ func benchmarkFormStream(b *testing.B, fileSize formstream.DataSize, reverse boo
 }
 
 func BenchmarkStdMultipartReadForm(b *testing.B) {
-	// default value in http package
-	const maxMemory = 32 * formstream.MB
-
 	b.Run("1MB", func(b *testing.B) {
-		benchmarkStdMultipart_ReadForm(b, 1*formstream.MB, maxMemory)
+		benchmarkStdMultipartReadForm(b, 1*formstream.MB)
 	})
 	b.Run("10MB", func(b *testing.B) {
-		benchmarkStdMultipart_ReadForm(b, 10*formstream.MB, maxMemory)
+		benchmarkStdMultipartReadForm(b, 10*formstream.MB)
 	})
 	b.Run("100MB", func(b *testing.B) {
-		benchmarkStdMultipart_ReadForm(b, 100*formstream.MB, maxMemory)
+		benchmarkStdMultipartReadForm(b, 100*formstream.MB)
 	})
 	b.Run("1GB", func(b *testing.B) {
-		benchmarkStdMultipart_ReadForm(b, 1*formstream.GB, maxMemory)
+		benchmarkStdMultipartReadForm(b, 1*formstream.GB)
 	})
 	b.Run("5GB", func(b *testing.B) {
-		benchmarkStdMultipart_ReadForm(b, 5*formstream.GB, maxMemory)
+		benchmarkStdMultipartReadForm(b, 5*formstream.GB)
 	})
 }
 
-func benchmarkStdMultipart_ReadForm(b *testing.B, fileSize formstream.DataSize, maxMemory formstream.DataSize) {
+func benchmarkStdMultipartReadForm(b *testing.B, fileSize formstream.DataSize) {
+	// default value in http package
+	const maxMemory = 32 * formstream.MB
+
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		mr := multipart.NewReader(r.Body, boundary)
 		form, err := mr.ReadForm(int64(maxMemory))

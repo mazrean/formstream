@@ -1,9 +1,11 @@
-package conditionjudge
+package conditionjudge_test
 
 import (
 	"errors"
 	"fmt"
 	"testing"
+
+	conditionjudge "github.com/mazrean/formstream/internal/condition_judge"
 )
 
 var errTest = errors.New("test error")
@@ -84,7 +86,7 @@ func TestConditionJudger(t *testing.T) {
 			hooks: map[string]*mockHook{},
 			events: []event{
 				{"key", "field", "", nil, "", "", ""},
-				{"hook", "stream", "one", ErrNoHooks, "", "", ""},
+				{"hook", "stream", "one", conditionjudge.ErrNoHooks, "", "", ""},
 			},
 		},
 		"no call": {
@@ -159,11 +161,11 @@ func TestConditionJudger(t *testing.T) {
 
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			hookMap := make(map[string]Hook[string, string, string], len(tt.hooks))
+			hookMap := make(map[string]conditionjudge.Hook[string, string, string], len(tt.hooks))
 			for key, hook := range tt.hooks {
 				hookMap[key] = hook
 			}
-			cj := NewConditionJudger(hookMap, preProcessFunc)
+			cj := conditionjudge.NewConditionJudger(hookMap, preProcessFunc)
 
 		EVENT_LOOP:
 			for _, event := range tt.events {
