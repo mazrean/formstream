@@ -41,7 +41,7 @@ type parserConfig struct {
 
 type ParserOption func(*parserConfig)
 
-type DataSize uint64
+type DataSize int64
 
 const (
 	_ DataSize = 1 << (iota * 10)
