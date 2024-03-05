@@ -155,16 +155,20 @@ var bufPool = sync.Pool{
 }
 
 func (pp *preProcessor) run(normalParam *normalParam) (*abnormalParam, error) {
-	buf := bufPool.Get().(*bytes.Buffer)
+	buf, ok := bufPool.Get().(*bytes.Buffer)
+	if !ok {
+		buf = new(bytes.Buffer)
+	}
 	buf.Reset()
 
-	n, err := io.CopyN(buf, normalParam.r, min(int64(pp.config.maxMemFileSize), int64(pp.config.maxMemSize))+1)
+	memLimit := min(pp.config.maxMemFileSize, pp.config.maxMemSize)
+	n, err := io.CopyN(buf, normalParam.r, int64(memLimit)+1)
 	if err != nil && !errors.Is(err, io.EOF) {
 		return nil, fmt.Errorf("failed to copy: %w", err)
 	}
 
 	var content io.ReadCloser
-	if n > int64(pp.config.maxMemFileSize) || n > int64(pp.config.maxMemSize) {
+	if DataSize(n) > memLimit {
 		if pp.file == nil {
 			f, err := os.CreateTemp("", "formstream-")
 			if err != nil {

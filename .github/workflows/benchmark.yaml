@@ -20,7 +20,7 @@ jobs:
           mkdir -p ./profile
           {
             echo "stdout<<EOF"
-            go test -benchmem -bench . -cpuprofile ./profile/cpu.out -memprofile ./profile/mem.out
+            go test -short -benchmem -bench . -cpuprofile ./profile/cpu.out -memprofile ./profile/mem.out
             echo "EOF"
           } >> $GITHUB_OUTPUT
         id: bench

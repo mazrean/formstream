@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/mazrean/formstream"
+	"github.com/mazrean/formstream/internal/myio"
 )
 
 func ExampleNewParser() {
@@ -69,44 +70,69 @@ large file contents
 
 const boundary = "boundary"
 
-func sampleForm(fileSize formstream.DataSize, boundary string, reverse bool) (io.Reader, error) {
-	b := bytes.NewBuffer(nil)
+func sampleForm(fileSize formstream.DataSize, boundary string, reverse bool) (io.ReadSeekCloser, error) {
+	if fileSize > 1*formstream.GB {
+		f, err := os.CreateTemp("", "formstream-test-form-")
+		if err != nil {
+			return nil, fmt.Errorf("failed to create temp file: %w", err)
+		}
 
-	mw := multipart.NewWriter(b)
+		err = createSampleForm(f, fileSize, boundary, reverse)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create sample form: %w", err)
+		}
+
+		return f, nil
+	}
+
+	buf := bytes.NewBuffer(nil)
+
+	err := createSampleForm(buf, fileSize, boundary, reverse)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create sample form: %w", err)
+	}
+
+	return myio.NopSeekCloser(bytes.NewReader(buf.Bytes())), nil
+}
+
+func createSampleForm(w io.Writer, fileSize formstream.DataSize, boundary string, reverse bool) error {
+	mw := multipart.NewWriter(w)
 	defer mw.Close()
 
 	err := mw.SetBoundary(boundary)
 	if err != nil {
-		return nil, fmt.Errorf("failed to set boundary: %w", err)
+		return fmt.Errorf("failed to set boundary: %w", err)
 	}
 
 	if !reverse {
 		err := mw.WriteField("field", "value")
 		if err != nil {
-			return nil, fmt.Errorf("failed to write field: %w", err)
+			return fmt.Errorf("failed to write field: %w", err)
 		}
 	}
 
 	mh := make(textproto.MIMEHeader)
 	mh.Set("Content-Disposition", `form-data; name="stream"; filename="file.txt"`)
 	mh.Set("Content-Type", "text/plain")
-	w, err := mw.CreatePart(mh)
+	pw, err := mw.CreatePart(mh)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create part: %w", err)
+		return fmt.Errorf("failed to create part: %w", err)
 	}
-	_, err = io.CopyN(w, strings.NewReader(strings.Repeat("a", int(fileSize))), int64(fileSize))
-	if err != nil {
-		return nil, fmt.Errorf("failed to copy: %w", err)
+	for i := 0; i < int(fileSize/formstream.MB); i++ {
+		_, err := pw.Write([]byte(strings.Repeat("a", int(formstream.MB))))
+		if err != nil {
+			return fmt.Errorf("failed to write: %w", err)
+		}
 	}
 
 	if reverse {
 		err := mw.WriteField("field", "value")
 		if err != nil {
-			return nil, fmt.Errorf("failed to write field: %w", err)
+			return fmt.Errorf("failed to write field: %w", err)
 		}
 	}
 
-	return b, nil
+	return nil
 }
 
 func BenchmarkFormStreamFastPath(b *testing.B) {
@@ -121,6 +147,18 @@ func BenchmarkFormStreamFastPath(b *testing.B) {
 	})
 	b.Run("1GB", func(b *testing.B) {
 		benchmarkFormStream(b, 1*formstream.GB, false)
+	})
+	b.Run("5GB", func(b *testing.B) {
+		if testing.Short() {
+			b.Skip("skipping test in short mode.")
+		}
+		benchmarkFormStream(b, 5*formstream.GB, false)
+	})
+	b.Run("10GB", func(b *testing.B) {
+		if testing.Short() {
+			b.Skip("skipping test in short mode.")
+		}
+		benchmarkFormStream(b, 10*formstream.GB, false)
 	})
 }
 
@@ -137,12 +175,31 @@ func BenchmarkFormStreamSlowPath(b *testing.B) {
 	b.Run("1GB", func(b *testing.B) {
 		benchmarkFormStream(b, 1*formstream.GB, true)
 	})
+	b.Run("5GB", func(b *testing.B) {
+		if testing.Short() {
+			b.Skip("skipping test in short mode.")
+		}
+		benchmarkFormStream(b, 5*formstream.GB, true)
+	})
+	b.Run("10GB", func(b *testing.B) {
+		if testing.Short() {
+			b.Skip("skipping test in short mode.")
+		}
+		benchmarkFormStream(b, 10*formstream.GB, true)
+	})
 }
 
 func benchmarkFormStream(b *testing.B, fileSize formstream.DataSize, reverse bool) {
+	r, err := sampleForm(fileSize, boundary, reverse)
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer r.Close()
+
+	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		b.StopTimer()
-		r, err := sampleForm(fileSize, boundary, reverse)
+		_, err := r.Seek(0, io.SeekStart)
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -169,32 +226,50 @@ func benchmarkFormStream(b *testing.B, fileSize formstream.DataSize, reverse boo
 		if err != nil {
 			b.Fatal(err)
 		}
-
 	}
 }
 
-func BenchmarkStdMultipart_ReadForm(b *testing.B) {
-	// default value in http package
-	const maxMemory = 32 * formstream.MB
-
+func BenchmarkStdMultipartReadForm(b *testing.B) {
 	b.Run("1MB", func(b *testing.B) {
-		benchmarkStdMultipart_ReadForm(b, 1*formstream.MB, maxMemory)
+		benchmarkStdMultipartReadForm(b, 1*formstream.MB)
 	})
 	b.Run("10MB", func(b *testing.B) {
-		benchmarkStdMultipart_ReadForm(b, 10*formstream.MB, maxMemory)
+		benchmarkStdMultipartReadForm(b, 10*formstream.MB)
 	})
 	b.Run("100MB", func(b *testing.B) {
-		benchmarkStdMultipart_ReadForm(b, 100*formstream.MB, maxMemory)
+		benchmarkStdMultipartReadForm(b, 100*formstream.MB)
 	})
 	b.Run("1GB", func(b *testing.B) {
-		benchmarkStdMultipart_ReadForm(b, 1*formstream.GB, maxMemory)
+		benchmarkStdMultipartReadForm(b, 1*formstream.GB)
+	})
+	b.Run("5GB", func(b *testing.B) {
+		if testing.Short() {
+			b.Skip("skipping test in short mode.")
+		}
+		benchmarkStdMultipartReadForm(b, 5*formstream.GB)
+	})
+	b.Run("10GB", func(b *testing.B) {
+		if testing.Short() {
+			b.Skip("skipping test in short mode.")
+		}
+		benchmarkStdMultipartReadForm(b, 10*formstream.GB)
 	})
 }
 
-func benchmarkStdMultipart_ReadForm(b *testing.B, fileSize formstream.DataSize, maxMemory formstream.DataSize) {
+func benchmarkStdMultipartReadForm(b *testing.B, fileSize formstream.DataSize) {
+	// default value in http package
+	const maxMemory = 32 * formstream.MB
+
+	r, err := sampleForm(fileSize, boundary, false)
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer r.Close()
+
+	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		b.StopTimer()
-		r, err := sampleForm(fileSize, boundary, false)
+		_, err := r.Seek(0, io.SeekStart)
 		if err != nil {
 			b.Fatal(err)
 		}

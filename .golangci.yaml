@@ -8,8 +8,6 @@ linters:
     - staticcheck
     - unused
     - gosimple
-    - structcheck
-    - varcheck
     - ineffassign
     - typecheck
     - revive
@@ -32,7 +30,6 @@ linters:
     - nilerr
     - nosprintfhostport
     - sqlclosecheck
-    - testpackage
     - unconvert
     - unparam
     - whitespace

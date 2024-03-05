@@ -10,8 +10,8 @@ def parse_group(group: str):
     if group.startswith("FormStream"):
         group = group.removeprefix("FormStream")
         return f"FormStream({group})"
-    elif group.startswith("StdMultipart_"):
-        group = group.split("_")[1]
+    elif group.startswith("StdMultipart"):
+        group = group.removeprefix("StdMultipart")
         return f"std(with {group})"
 
     return group

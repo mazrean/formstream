@@ -6,7 +6,7 @@ import (
 
 func (p *Parser) Register(name string, fn StreamHookFunc, options ...RegisterOption) error {
 	if _, ok := p.hookMap[name]; ok {
-		return ErrDuplicateHookName{Name: name}
+		return DuplicateHookNameError{Name: name}
 	}
 
 	c := &registerConfig{}
@@ -22,11 +22,11 @@ func (p *Parser) Register(name string, fn StreamHookFunc, options ...RegisterOpt
 	return nil
 }
 
-type ErrDuplicateHookName struct {
+type DuplicateHookNameError struct {
 	Name string
 }
 
-func (e ErrDuplicateHookName) Error() string {
+func (e DuplicateHookNameError) Error() string {
 	return fmt.Sprintf("duplicate hook name: %s", e.Name)
 }
 
