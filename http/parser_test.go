@@ -17,6 +17,7 @@ import (
 	"github.com/mazrean/formstream"
 	httpform "github.com/mazrean/formstream/http"
 	"github.com/mazrean/formstream/internal/myio"
+	"golang.org/x/sync/errgroup"
 )
 
 func TestExample(t *testing.T) {
@@ -172,6 +173,86 @@ func createSampleForm(w io.Writer, fileSize formstream.DataSize, boundary string
 	}
 
 	return nil
+}
+
+func TestSlowWriter(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping test in short mode.")
+	}
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		parser, err := httpform.NewParser(r)
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+
+		err = parser.Register("stream", func(r io.Reader, header formstream.Header) error {
+			// get field value
+			_, _, _ = parser.Value("field")
+
+			_, err := io.Copy(myio.SlowWriter(), r)
+			if err != nil {
+				return fmt.Errorf("failed to copy: %w", err)
+			}
+
+			return nil
+		}, formstream.WithRequiredPart("field"))
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		err = parser.Parse()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		w.WriteHeader(http.StatusCreated)
+	}))
+	defer srv.Close()
+
+	f, err := os.CreateTemp("", "formstream-test-form-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+
+	err = createSampleForm(f, 1*formstream.GB, boundary, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	eg := &errgroup.Group{}
+	for i := 0; i < 100; i++ {
+		f, err := os.Open(f.Name())
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		req, err := http.NewRequest(http.MethodPost, srv.URL, f)
+		if err != nil {
+			t.Fatal(err)
+		}
+		req.Header.Set("Content-Type", fmt.Sprintf("multipart/form-data; boundary=%s", boundary))
+
+		eg.Go(func() error {
+			res, err := http.DefaultClient.Do(req)
+			if err != nil {
+				return fmt.Errorf("failed to request: %w", err)
+			}
+
+			if res.StatusCode != http.StatusCreated {
+				return fmt.Errorf("status code is wrong: expected: %d, actual: %d", http.StatusCreated, res.StatusCode)
+			}
+
+			return nil
+		})
+	}
+
+	err = eg.Wait()
+	if err != nil {
+		t.Error(err)
+	}
 }
 
 func BenchmarkFormStreamFastPath(b *testing.B) {
