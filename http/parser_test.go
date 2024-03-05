@@ -357,7 +357,7 @@ func benchmarkFormStream(b *testing.B, fileSize formstream.DataSize, reverse boo
 	}
 }
 
-func BenchmarkStdMultipart_ReadForm(b *testing.B) {
+func BenchmarkStdMultipartReadForm(b *testing.B) {
 	// default value in http package
 	const maxMemory = 32 * formstream.MB
 
