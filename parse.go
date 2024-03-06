@@ -21,6 +21,7 @@ var (
 	ErrTooLargeForm = errors.New("too large form")
 )
 
+// Parse parses the multipart form from r.
 func (p *Parser) Parse(r io.Reader) (err error) {
 	hsc := newHookSatisfactionChecker(p.hookMap, &p.parserConfig)
 	defer func() {

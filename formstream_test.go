@@ -118,8 +118,10 @@ func createSampleForm(w io.Writer, fileSize formstream.DataSize, boundary string
 	if err != nil {
 		return fmt.Errorf("failed to create part: %w", err)
 	}
+
+	mbData := make([]byte, formstream.MB)
 	for i := 0; i < int(fileSize/formstream.MB); i++ {
-		_, err := pw.Write([]byte(strings.Repeat("a", int(formstream.MB))))
+		_, err := pw.Write(mbData)
 		if err != nil {
 			return fmt.Errorf("failed to write: %w", err)
 		}

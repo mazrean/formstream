@@ -57,24 +57,32 @@ const (
 	defaultMaxMemFileSize = 32 * MB
 )
 
+// WithMaxParts sets the maximum number of parts to be parsed.
+// default: 10000
 func WithMaxParts(maxParts uint) ParserOption {
 	return func(c *parserConfig) {
 		c.maxParts = maxParts
 	}
 }
 
+// WithMaxHeaders sets the maximum number of headers to be parsed.
+// default: 10000
 func WithMaxHeaders(maxHeaders uint) ParserOption {
 	return func(c *parserConfig) {
 		c.maxHeaders = maxHeaders
 	}
 }
 
+// WithMaxMemSize sets the maximum memory size to be used for parsing.
+// default: 32MB
 func WithMaxMemSize(maxMemSize DataSize) ParserOption {
 	return func(c *parserConfig) {
 		c.maxMemSize = maxMemSize
 	}
 }
 
+// WithMaxMemFileSize sets the maximum memory size to be used for parsing a file.
+// default: 32MB
 func WithMaxMemFileSize(maxMemFileSize DataSize) ParserOption {
 	return func(c *parserConfig) {
 		c.maxMemFileSize = maxMemFileSize
@@ -86,10 +94,12 @@ type Value struct {
 	header  Header
 }
 
+// Unwrap returns the content and header of the value.
 func (v Value) Unwrap() (string, Header) {
 	return string(v.content), v.header
 }
 
+// UnwrapRaw returns the raw content and header of the value.
 func (v Value) UnwrapRaw() ([]byte, Header) {
 	return v.content, v.header
 }
@@ -112,18 +122,26 @@ func newHeader(h textproto.MIMEHeader) Header {
 	}
 }
 
+// Get returns the first value associated with the given key.
+// If there are no values associated with the key, Get returns "".
 func (h Header) Get(key string) string {
 	return h.header.Get(key)
 }
 
+// ContentType returns the value of the "Content-Type" header field.
+// If there are no values associated with the key, ContentType returns "".
 func (h Header) ContentType() string {
 	return h.header.Get("Content-Type")
 }
 
+// Name returns the value of the "name" parameter in the "Content-Disposition" header field.
+// If there are no values associated with the key, Name returns "".
 func (h Header) Name() string {
 	return h.dispositionParams["name"]
 }
 
+// FileName returns the value of the "filename" parameter in the "Content-Disposition" header field.
+// If there are no values associated with the key, FileName returns "".
 func (h Header) FileName() string {
 	return h.dispositionParams["filename"]
 }
