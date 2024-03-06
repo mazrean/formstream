@@ -1,6 +1,7 @@
 package echoform
 
 import (
+	"errors"
 	"io"
 	"mime"
 	"net/http"
@@ -32,6 +33,15 @@ func NewParser(c echo.Context, options ...formstream.ParserOption) (*Parser, err
 	}, nil
 }
 
+// Parse parses the request body.
+// It returns the echo.HTTPError if the hook function returns an echo.HTTPError.
 func (p *Parser) Parse() error {
-	return p.Parser.Parse(p.reader)
+	err := p.Parser.Parse(p.reader)
+
+	var httpErr *echo.HTTPError
+	if errors.As(err, &httpErr) {
+		return httpErr
+	}
+
+	return err
 }
