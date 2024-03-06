@@ -32,6 +32,7 @@ func NewParser(c *gin.Context, options ...formstream.ParserOption) (*Parser, err
 	}, nil
 }
 
+// Parse parses the request body.
 func (p *Parser) Parse() error {
 	return p.Parser.Parse(p.reader)
 }
