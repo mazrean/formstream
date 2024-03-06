@@ -4,6 +4,7 @@ import (
 	"fmt"
 )
 
+// Register registers a stream hook with the given name.
 func (p *Parser) Register(name string, fn StreamHookFunc, options ...RegisterOption) error {
 	if _, ok := p.hookMap[name]; ok {
 		return DuplicateHookNameError{Name: name}
@@ -36,6 +37,7 @@ type registerConfig struct {
 
 type RegisterOption func(*registerConfig)
 
+// WithRequiredPart sets the required part names for the stream hook.
 func WithRequiredPart(name string) RegisterOption {
 	return func(c *registerConfig) {
 		c.requireParts = append(c.requireParts, name)
