@@ -60,7 +60,7 @@ func createUserHandler(c echo.Context) error {
 		return c.NoContent(http.StatusBadRequest)
 	}
 
-	err = parser.Register("icon", func(r io.Reader, header formstream.Header) error {
+	err = parser.Register("icon", func(r io.Reader, _ formstream.Header) error {
 		name, _, _ := parser.Value("name")
 		password, _, _ := parser.Value("password")
 

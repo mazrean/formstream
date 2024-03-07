@@ -1,6 +1,6 @@
 run:
   skip-dirs:
-    - mock
+    - example
 linters:
   enable:
     - govet
