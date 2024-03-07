@@ -187,7 +187,7 @@ func TestSlowWriter(t *testing.T) {
 			return
 		}
 
-		err = parser.Register("stream", func(r io.Reader, header formstream.Header) error {
+		err = parser.Register("stream", func(r io.Reader, _ formstream.Header) error {
 			// get field value
 			_, _, _ = parser.Value("field")
 
