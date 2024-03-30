@@ -26,6 +26,13 @@ def parse_file_size(mem_size: str):
         raise Exception("Unknown memory size: " + mem_size)
 
 
+group_colors = {
+    "FormStream(FastPath)": "#ADFF2F",
+    "FormStream(SlowPath)": "#00FF00",
+    "std(with NextPart)": "#6495ED",
+    "std(with ReadForm)": "#D3D3D3",
+}
+
 file_sizes = []
 time_per_ops = {}
 mem_per_ops = {}
@@ -51,15 +58,16 @@ for line in sys.stdin:
 # remove duplicates
 file_sizes = sorted(set(file_sizes), key=file_sizes.index)
 
-bar_width = 0.25
+bar_width = 0.2
 
-index = np.arange(len(file_sizes))
+index = np.arange(len(file_sizes)) - 0.1
 fig, ax_time = plt.subplots(figsize=(12, 7))
 for i, (group, group_time_dict) in enumerate(time_per_ops.items()):
     ax_time.bar(
         index + i * bar_width,
         [group_time_dict[fs] / 1e6 for fs in file_sizes],
         bar_width,
+        color=group_colors[group],
         label=group,
     )
 
@@ -79,6 +87,7 @@ for i, (group, group_mem_dict) in enumerate(mem_per_ops.items()):
         index + i * bar_width,
         [group_mem_dict[fs] for fs in file_sizes],
         bar_width,
+        color=group_colors[group],
         label=group,
     )
 
