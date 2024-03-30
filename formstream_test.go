@@ -2,6 +2,7 @@ package formstream_test
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -209,7 +210,7 @@ func benchmarkFormStream(b *testing.B, fileSize formstream.DataSize, reverse boo
 
 		parser := formstream.NewParser(boundary)
 
-		err = parser.Register("stream", func(r io.Reader, header formstream.Header) error {
+		err = parser.Register("stream", func(r io.Reader, _ formstream.Header) error {
 			// get field value
 			_, _, _ = parser.Value("field")
 
@@ -279,7 +280,7 @@ func benchmarkStdMultipartNextPart(b *testing.B, fileSize formstream.DataSize) {
 
 			for {
 				p, err := mr.NextPart()
-				if err == io.EOF {
+				if errors.Is(err, io.EOF) {
 					break
 				}
 				if err != nil {
