@@ -2,6 +2,7 @@ package formstream_test
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -42,7 +43,7 @@ large file contents
 		}
 
 		return nil
-	})
+	}, formstream.WithRequiredPart("field"))
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -209,7 +210,7 @@ func benchmarkFormStream(b *testing.B, fileSize formstream.DataSize, reverse boo
 
 		parser := formstream.NewParser(boundary)
 
-		err = parser.Register("stream", func(r io.Reader, header formstream.Header) error {
+		err = parser.Register("stream", func(r io.Reader, _ formstream.Header) error {
 			// get field value
 			_, _, _ = parser.Value("field")
 
@@ -228,6 +229,85 @@ func benchmarkFormStream(b *testing.B, fileSize formstream.DataSize, reverse boo
 		if err != nil {
 			b.Fatal(err)
 		}
+	}
+}
+
+func BenchmarkStdMultipartNextPart(b *testing.B) {
+	b.Run("1MB", func(b *testing.B) {
+		benchmarkStdMultipartNextPart(b, 1*formstream.MB)
+	})
+	b.Run("10MB", func(b *testing.B) {
+		benchmarkStdMultipartNextPart(b, 10*formstream.MB)
+	})
+	b.Run("100MB", func(b *testing.B) {
+		benchmarkStdMultipartNextPart(b, 100*formstream.MB)
+	})
+	b.Run("1GB", func(b *testing.B) {
+		benchmarkStdMultipartNextPart(b, 1*formstream.GB)
+	})
+	b.Run("5GB", func(b *testing.B) {
+		if testing.Short() {
+			b.Skip("skipping test in short mode.")
+		}
+		benchmarkStdMultipartNextPart(b, 5*formstream.GB)
+	})
+	b.Run("10GB", func(b *testing.B) {
+		if testing.Short() {
+			b.Skip("skipping test in short mode.")
+		}
+		benchmarkStdMultipartNextPart(b, 10*formstream.GB)
+	})
+}
+
+func benchmarkStdMultipartNextPart(b *testing.B, fileSize formstream.DataSize) {
+	r, err := sampleForm(fileSize, boundary, false)
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer r.Close()
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		b.StopTimer()
+		_, err := r.Seek(0, io.SeekStart)
+		if err != nil {
+			b.Fatal(err)
+		}
+		b.StartTimer()
+
+		func() {
+			mr := multipart.NewReader(r, boundary)
+
+			for {
+				p, err := mr.NextPart()
+				if errors.Is(err, io.EOF) {
+					break
+				}
+				if err != nil {
+					b.Fatal(err)
+				}
+
+				if p.FormName() == "field" {
+					sb := &strings.Builder{}
+					_, err := io.Copy(sb, p)
+					if err != nil {
+						b.Fatal(err)
+					}
+
+					_ = sb.String()
+				} else {
+					_, err := io.Copy(io.Discard, p)
+					if err != nil {
+						b.Fatal(err)
+					}
+				}
+
+				_, err = io.Copy(io.Discard, p)
+				if err != nil {
+					b.Fatal(err)
+				}
+			}
+		}()
 	}
 }
 

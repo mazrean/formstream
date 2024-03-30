@@ -65,7 +65,7 @@ func createUserHandler(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	err = parser.Register("icon", func(r io.Reader, header formstream.Header) error {
+	err = parser.Register("icon", func(r io.Reader, _ formstream.Header) error {
 		name, _, _ := parser.Value("name")
 		password, _, _ := parser.Value("password")
 
@@ -317,7 +317,7 @@ func benchmarkFormStream(b *testing.B, fileSize formstream.DataSize, reverse boo
 			return
 		}
 
-		err = parser.Register("stream", func(r io.Reader, header formstream.Header) error {
+		err = parser.Register("stream", func(r io.Reader, _ formstream.Header) error {
 			// get field value
 			_, _, _ = parser.Value("field")
 
