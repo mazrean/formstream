@@ -23,7 +23,7 @@ var (
 
 // Parse parses the multipart form from r.
 func (p *Parser) Parse(r io.Reader) (err error) {
-	hsc := newHookSatisfactionChecker(p.hookMap, &p.parserConfig)
+	hsc := newHookSatisfactionChecker(p.hookMap, p.defaultHook, &p.parserConfig)
 	defer func() {
 		deferErr := hsc.Close()
 		// capture the error of Close()
@@ -66,15 +66,17 @@ func (p *Parser) parse(r io.Reader, hsc conditionjudge.IConditionJudger[string, 
 		}
 
 		header := newHeader(part.Header)
-		if hsc.IsHookExist(part.FormName()) {
-			_, err := hsc.HookEvent(part.FormName(), &normalParam{
+
+		formName := part.FormName()
+		if formName != "" && hsc.IsHookExist(formName) {
+			_, err := hsc.HookEvent(formName, &normalParam{
 				r: part,
 				h: header,
 			})
 			if err != nil {
 				return fmt.Errorf("failed to run or set hook: %w", err)
 			}
-		} else {
+		} else if part.FileName() == "" {
 			b := new(bytes.Buffer)
 
 			if DataSize(len(part.FormName())) > p.maxMemSize {
@@ -96,6 +98,14 @@ func (p *Parser) parse(r io.Reader, hsc conditionjudge.IConditionJudger[string, 
 				content: b.Bytes(),
 				header:  header,
 			})
+		} else if p.defaultHook != nil {
+			_, err := hsc.HookEvent("", &normalParam{
+				r: part,
+				h: header,
+			})
+			if err != nil {
+				return fmt.Errorf("failed to run or set hook: %w", err)
+			}
 		}
 
 		err = hsc.KeyEvent(part.FormName())
@@ -112,11 +122,17 @@ type hookSatisfactionChecker struct {
 	preProcessor *preProcessor
 }
 
-func newHookSatisfactionChecker(streamHooks map[string]streamHook, config *parserConfig) *hookSatisfactionChecker {
+func newHookSatisfactionChecker(streamHooks map[string]streamHook, defaultHook *streamHook, config *parserConfig) *hookSatisfactionChecker {
 	judgeHooks := make(map[string]conditionjudge.Hook[string, *normalParam, *abnormalParam], len(streamHooks))
 	for name, hook := range streamHooks {
 		h := judgeHook(hook)
 		judgeHooks[name] = &h
+	}
+
+	if defaultHook != nil {
+		h := judgeHook(*defaultHook)
+		// set the default hook to the empty string
+		judgeHooks[""] = &h
 	}
 
 	preProcess := &preProcessor{

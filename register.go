@@ -1,6 +1,7 @@
 package formstream
 
 import (
+	"errors"
 	"fmt"
 )
 
@@ -16,6 +17,25 @@ func (p *Parser) Register(name string, fn StreamHookFunc, options ...RegisterOpt
 	}
 
 	p.hookMap[name] = streamHook{
+		fn:           fn,
+		requireParts: c.requireParts,
+	}
+
+	return nil
+}
+
+// RegisterDefault registers a default stream hook.
+func (p *Parser) RegisterDefault(fn StreamHookFunc, options ...RegisterOption) error {
+	if p.defaultHook != nil {
+		return errors.New("default hook already registered")
+	}
+
+	c := &registerConfig{}
+	for _, opt := range options {
+		opt(c)
+	}
+
+	p.defaultHook = &streamHook{
 		fn:           fn,
 		requireParts: c.requireParts,
 	}

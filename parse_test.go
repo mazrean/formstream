@@ -19,6 +19,7 @@ func TestParser_Parse(t *testing.T) {
 
 	cases := []struct {
 		name           string
+		defaultHook    *streamHook
 		inputFormData  string
 		outputValueMap map[string][]Value
 		mockSetup      func(*mock.MockIConditionJudger[string, *normalParam, *abnormalParam])
@@ -225,6 +226,38 @@ func TestParser_Parse(t *testing.T) {
 			},
 			err: ErrTooLargeForm,
 		},
+		{
+			name: "no hook",
+			inputFormData: "--boundary\n" +
+				"Content-Disposition: form-data; name=\"stream1\"; filename=\"test.txt\"\n" +
+				"Content-Type: text/plain\n" +
+				"\n" +
+				"stream1Value\n" +
+				"--boundary--\n",
+			outputValueMap: map[string][]Value{},
+			mockSetup: func(m *mock.MockIConditionJudger[string, *normalParam, *abnormalParam]) {
+				m.EXPECT().IsHookExist("stream1").Return(false)
+				m.EXPECT().KeyEvent("stream1").Return(nil)
+			},
+		},
+		{
+			name: "no hook with default hook",
+			defaultHook: &streamHook{
+				fn: func(_ io.Reader, _ Header) error { return nil },
+			},
+			inputFormData: "--boundary\n" +
+				"Content-Disposition: form-data; name=\"stream1\"; filename=\"test.txt\"\n" +
+				"Content-Type: text/plain\n" +
+				"\n" +
+				"stream1Value\n" +
+				"--boundary--\n",
+			outputValueMap: map[string][]Value{},
+			mockSetup: func(m *mock.MockIConditionJudger[string, *normalParam, *abnormalParam]) {
+				m.EXPECT().IsHookExist("stream1").Return(false)
+				m.EXPECT().HookEvent("", gomock.Any()).Return(true, nil)
+				m.EXPECT().KeyEvent("stream1").Return(nil)
+			},
+		},
 	}
 
 	for _, tc := range cases {
@@ -236,8 +269,9 @@ func TestParser_Parse(t *testing.T) {
 			tc.mockSetup(mockJudger)
 
 			parser := &Parser{
-				boundary: "boundary",
-				valueMap: make(map[string][]Value),
+				boundary:    "boundary",
+				defaultHook: tc.defaultHook,
+				valueMap:    make(map[string][]Value),
 				parserConfig: parserConfig{
 					maxParts:       5,
 					maxHeaders:     5,

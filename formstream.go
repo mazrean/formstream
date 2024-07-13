@@ -7,9 +7,10 @@ import (
 )
 
 type Parser struct {
-	boundary string
-	valueMap map[string][]Value
-	hookMap  map[string]streamHook
+	boundary    string
+	valueMap    map[string][]Value
+	hookMap     map[string]streamHook
+	defaultHook *streamHook
 	parserConfig
 }
 
