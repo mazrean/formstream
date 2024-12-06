@@ -13,7 +13,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: golangci-lint
-        uses: reviewdog/action-golangci-lint@v2.6
+        uses: reviewdog/action-golangci-lint@v2.7
         with:
           go_version_file: go.mod
           reporter: github-pr-review
