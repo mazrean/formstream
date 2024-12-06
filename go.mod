@@ -40,7 +40,7 @@ require (
 
 require (
 	github.com/gin-gonic/gin v1.10.0
-	github.com/labstack/echo/v4 v4.12.0
+	github.com/labstack/echo/v4 v4.13.0
 	golang.org/x/mod v0.18.0 // indirect
 	golang.org/x/sync v0.9.0
 	golang.org/x/sys v0.21.0 // indirect
