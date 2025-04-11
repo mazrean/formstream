@@ -4,7 +4,7 @@ go 1.22
 
 toolchain go1.23.0
 
-require go.uber.org/mock v0.5.0
+require go.uber.org/mock v0.5.1
 
 require (
 	github.com/bytedance/sonic v1.11.6 // indirect
