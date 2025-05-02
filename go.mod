@@ -1,10 +1,9 @@
 module github.com/mazrean/formstream
 
 go 1.22
+toolchain go1.24.1
 
-toolchain go1.23.0
-
-require go.uber.org/mock v0.5.0
+require go.uber.org/mock v0.5.2
 
 require (
 	github.com/bytedance/sonic v1.11.6 // indirect
