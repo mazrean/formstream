@@ -1,35 +1,44 @@
-run:
-  skip-dirs:
-    - example
+version: "2"
 linters:
   enable:
-    - govet
-    - errcheck
-    - staticcheck
-    - unused
-    - gosimple
-    - ineffassign
-    - typecheck
-    - revive
-    - gofmt
     - asasalint
     - asciicheck
     - bidichk
     - errname
     - errorlint
     - exhaustive
-    - exportloopref
     - forcetypeassert
     - gocheckcompilerdirectives
     - gocritic
     - goheader
-    - goimports
     - gosec
     - misspell
     - nakedret
     - nilerr
     - nosprintfhostport
+    - revive
     - sqlclosecheck
     - unconvert
     - unparam
     - whitespace
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
