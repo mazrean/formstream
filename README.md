@@ -4,7 +4,6 @@
 ![CI main](https://github.com/mazrean/formstream/actions/workflows/ci.yaml/badge.svg)
 [![codecov](https://codecov.io/gh/mazrean/formstream/branch/main/graph/badge.svg)](https://codecov.io/gh/mazrean/formstream)
 [![Go Reference](https://pkg.go.dev/badge/github.com/mazrean/formstream.svg)](https://pkg.go.dev/github.com/mazrean/formstream)
-<a href="https://flatt.tech/oss/gmo/trampoline" target="_blank"><img src="https://flatt.tech/assets/images/badges/gmo-oss.svg" height="24px"/></a>
 
 FormStream is a Golang streaming parser for multipart data, primarily used in web form submissions and file uploads.
 
@@ -150,3 +149,9 @@ Optimal multipart handling strategies include:
 ### Advantages of FormStream
 
 FormStream enhances this process. It outpaces the [`(*Reader).ReadForm`](https://pkg.go.dev/mime/multipart#Reader.ReadForm) method and, unlike [`(*Reader).NextPart`](https://pkg.go.dev/mime/multipart#Reader.NextPart), can handle multipart data in any order. This adaptability makes FormStream suitable for a range of multipart data scenarios.
+
+## Supports
+
+This project receives support from GMO FlattSecurity's “GMO Open Source Developer Support Program” and regularly conducts security assessments using “Takumi byGMO.”
+
+<a href="https://flatt.tech/oss/gmo/trampoline" target="_blank"><img src="https://flatt.tech/assets/images/badges/gmo-oss.svg" height="24px"/></a>
