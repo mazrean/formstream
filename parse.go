@@ -144,10 +144,9 @@ type abnormalParam struct {
 }
 
 type preProcessor struct {
-	config   *parserConfig
-	offset   int64
-	file     *os.File
-	filePath string
+	config *parserConfig
+	offset int64
+	file   *os.File
 }
 
 var bufPool = sync.Pool{
@@ -177,7 +176,6 @@ func (pp *preProcessor) run(normalParam *normalParam) (*abnormalParam, error) {
 				return nil, fmt.Errorf("failed to create temp file: %w", err)
 			}
 			pp.file = f
-			pp.filePath = f.Name()
 		}
 
 		bufSize, err := io.Copy(pp.file, buf)
@@ -221,11 +219,13 @@ func (pp *preProcessor) Close() error {
 		return nil
 	}
 
+	filepath := pp.file.Name()
+
 	// Close the file handle first
 	closeErr := pp.file.Close()
 
 	// Remove the temporary file from disk
-	removeErr := os.Remove(pp.filePath)
+	removeErr := os.Remove(filepath)
 
 	// Return combined errors if any
 	if closeErr != nil || removeErr != nil {
