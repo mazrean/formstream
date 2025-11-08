@@ -219,7 +219,20 @@ func (pp *preProcessor) Close() error {
 		return nil
 	}
 
-	return pp.file.Close()
+	filepath := pp.file.Name()
+
+	// Close the file handle first
+	closeErr := pp.file.Close()
+
+	// Remove the temporary file from disk
+	removeErr := os.Remove(filepath)
+
+	// Return combined errors if any
+	if closeErr != nil || removeErr != nil {
+		return errors.Join(closeErr, removeErr)
+	}
+
+	return nil
 }
 
 type judgeHook struct {
