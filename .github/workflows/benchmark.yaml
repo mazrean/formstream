@@ -24,7 +24,7 @@ jobs:
             echo "EOF"
           } >> $GITHUB_OUTPUT
         id: bench
-      - uses: actions/upload-artifact@v5
+      - uses: actions/upload-artifact@v6
         id: artifact
         with:
           name: profile
