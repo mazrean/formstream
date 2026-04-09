@@ -1,6 +1,6 @@
 module github.com/mazrean/formstream
 
-go 1.24.0
+go 1.25.0
 
 require go.uber.org/mock v0.6.0
 
@@ -41,7 +41,7 @@ require (
 	github.com/gin-gonic/gin v1.11.0
 	github.com/labstack/echo/v4 v4.15.0
 	golang.org/x/mod v0.30.0 // indirect
-	golang.org/x/sync v0.19.0
+	golang.org/x/sync v0.20.0
 	golang.org/x/sys v0.39.0 // indirect
 	golang.org/x/tools v0.39.0 // indirect
 )
