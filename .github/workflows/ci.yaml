@@ -34,7 +34,7 @@ jobs:
           file: ./coverage.txt
           fail_ci_if_error: true
           token: ${{ secrets.CODECOV_TOKEN }}
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@v7
         with:
           name: coverage.txt
           path: coverage.txt
