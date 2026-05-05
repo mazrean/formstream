@@ -1,0 +1,10 @@
+[tools]
+# common
+apm = "latest"
+gh = "latest"
+
+# go
+go = "1.24"
+"go:github.com/golangci/golangci-lint/v2/cmd/golangci-lint" = "latest"
+
+# Note: claude-code / codex / other coding-agent CLIs are intentionally NOT pinned per project policy.

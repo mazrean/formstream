@@ -1,0 +1,8 @@
+name: formstream
+version: 0.1.0
+description: Streaming multipart/form-data parser for Go (echo / gin / net/http adapters).
+
+dependencies:
+  apm:
+    - mazrean/apm-plackage/common
+    - mazrean/apm-plackage/go
