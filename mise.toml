@@ -5,6 +5,10 @@ gh = "latest"
 
 # go
 go = "1.24"
-"go:github.com/golangci/golangci-lint/v2/cmd/golangci-lint" = "latest"
+"go:golang.org/x/tools/gopls" = "latest"
 
+# Note: golangci-lint is intentionally NOT pinned — use the per-repo `tools/lint`
+# Go module via `go tool lint ./...` (apm-plackage/go convention).
+# Note: kessoku (compile-time DI) is consumed via the go.mod `tool` directive,
+# not via mise (apm-plackage/go convention).
 # Note: claude-code / codex / other coding-agent CLIs are intentionally NOT pinned per project policy.
