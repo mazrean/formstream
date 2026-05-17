@@ -1,6 +1,6 @@
 [tools]
 # common
-apm = "latest"
+"ubi:microsoft/apm" = "latest"
 gh = "latest"
 
 # go
