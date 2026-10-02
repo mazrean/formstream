@@ -35,15 +35,15 @@ require (
 	golang.org/x/arch v0.22.0 // indirect
 	golang.org/x/crypto v0.53.0 // indirect
 	golang.org/x/net v0.56.0 // indirect
-	golang.org/x/text v0.38.0 // indirect
+	golang.org/x/text v0.40.0 // indirect
 	google.golang.org/protobuf v1.36.10 // indirect
 )
 
 require (
 	github.com/gin-gonic/gin v1.12.0
-	github.com/labstack/echo/v4 v4.15.4
-	golang.org/x/mod v0.36.0 // indirect
+	github.com/labstack/echo/v4 v4.16.0
+	golang.org/x/mod v0.37.0 // indirect
 	golang.org/x/sync v0.23.0
 	golang.org/x/sys v0.46.0 // indirect
-	golang.org/x/tools v0.45.0 // indirect
+	golang.org/x/tools v0.47.0 // indirect
 )
