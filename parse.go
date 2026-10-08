@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"mime/multipart"
 	"os"
 	"sync"
@@ -82,7 +83,11 @@ func (p *Parser) parse(r io.Reader, hsc conditionjudge.IConditionJudger[string, 
 			}
 			p.maxMemSize -= DataSize(len(part.FormName()))
 
-			n, err := io.Copy(b, part)
+			readLimit := int64(p.maxMemSize)
+			if readLimit < math.MaxInt64 {
+				readLimit++
+			}
+			n, err := io.Copy(b, io.LimitReader(part, readLimit))
 			if err != nil {
 				return fmt.Errorf("failed to copy part: %w", err)
 			}
